@@ -43,6 +43,11 @@ public:
 	Grid<int32> partialGrid(int32 sy, int32 sx) const;
 	Grid<int32> partialGoal(int32 sy, int32 sx) const;
 
+	
+	Point BFS(Point start, int32 target) const;
+
+	std::vector<std::pair<int32, int32>> sortToMatchPartially(int32 targetRow) const;
+	
 
 private:
 	void shift_up(const Array<Point>& removed_cells);

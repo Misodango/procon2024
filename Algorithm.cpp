@@ -14,7 +14,7 @@ namespace Algorithm {
 		Point bestPos(0, 0);
 		int32 bestDirection = 0;
 
-		
+
 		while (improved && !board.is_goal()) {
 			improved = false;
 
@@ -27,7 +27,8 @@ namespace Algorithm {
 						Console << U"y, x : {}, {}"_fmt(y, x);
 						for (int32 dir = 0; dir < 4; ++dir) {
 							Board newBoard = board.applyPatternCopy(pattern, Point(x, y), dir);
-							int32 newDiff = newBoard.calculateDifference(board.grid);
+							int32 newDiff = newBoard.calculateDifference(newBoard.grid);
+
 							if (seen.count(newBoard.hash())) {
 								Console << U"seen already";
 								continue;
@@ -87,14 +88,15 @@ namespace Algorithm {
 		Solution bestSolution;
 		int32 bestScore = std::numeric_limits<int32>::max();
 		int steps = 0;
-
+		std::map<size_t, bool> seen;
 		while (!beam.empty() && steps < maxSteps) {
 			std::vector<State> nextBeam;
 
 			for (int i = 0; i < beamWidth && !beam.empty(); ++i) {
 				State current = beam.top();
 				beam.pop();
-
+				if (seen.count(current.board.hash())) continue;
+				seen[current.board.hash()] = 1;
 				if (current.board.is_goal()) {
 					return current.solution;
 				}
@@ -138,84 +140,7 @@ namespace Algorithm {
 
 		return bestSolution; // 最良の解を返す（ゴールに到達していなくても）
 	}
-	/*
-	Solution dynamicProgramming(const Board& initialBoard, const Array<Pattern>& patterns, double timeLimit) {
-		struct State {
-			int32 score;
-			std::vector<std::tuple<Pattern, Point, int32>> steps;
 
-			State(int32 s = std::numeric_limits<int32>::max()) : score(s) {}
-		};
-
-		const int32 tileCount = initialBoard.grid.height() * initialBoard.grid.width();
-		std::unordered_map<Board, State> dp;
-		dp[initialBoard] = State(tileCount - initialBoard.calculateAdvancedDifference());
-
-		std::queue<Board> q;
-		q.push(initialBoard);
-
-		Board goalBoard = Board(initialBoard.grid.height(), initialBoard.grid.width());
-		int32 bestScore = std::numeric_limits<int32>::max();
-
-		auto startTime = std::chrono::high_resolution_clock::now();
-
-		Solution tmpSolution;
-
-		while (!q.empty()) {
-
-			auto currentTime = std::chrono::high_resolution_clock::now();
-			double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
-
-			if (elapsedTime > timeLimit) {
-				Console << U"DP: Time limit reached. Returning best solution found so far.";
-				return tmpSolution;
-				// break;
-			}
-
-			Board currentBoard = q.front();
-			q.pop();
-
-			if (currentBoard.is_goal()) {
-				if (dp[currentBoard].score < bestScore) {
-					goalBoard = currentBoard;
-					bestScore = dp[currentBoard].score;
-				}
-				continue;
-			}
-
-			for (const auto& pattern : patterns) {
-				if (pattern.grid.height() >= Max(initialBoard.grid.height(), initialBoard.grid.width())) continue;
-				for (int32 y = -int32(pattern.grid.height()) + 1; y < currentBoard.height; ++y) {
-					for (int32 x = -int32(pattern.grid.width()) + 1; x < currentBoard.width; ++x) {
-						for (int32 dir = 0; dir < 4; ++dir) {
-							Board newBoard = currentBoard.applyPatternCopy(pattern, Point(x, y), dir);
-							// int32 newScore = dp[currentBoard].score + pattern.p;
-							int32 newScore = dp[currentBoard].score + tileCount - newBoard.calculateDifference(initialBoard.goal);
-							if (dp.find(newBoard) == dp.end() || newScore < dp[newBoard].score) {
-								dp[newBoard] = State(newScore);
-								dp[newBoard].steps = dp[currentBoard].steps;
-								dp[newBoard].steps.push_back(std::make_tuple(pattern, Point(x, y), dir));
-								q.push(newBoard);
-								tmpSolution.steps = dp[newBoard].steps;
-								tmpSolution.score = newScore;
-								Console << newScore;
-							}
-						}
-					}
-				}
-			}
-		}
-
-		if (bestScore == std::numeric_limits<int32>::max()) {
-			return Solution(); // No solution found
-		}
-
-		Solution solution;
-		solution.score = bestScore;
-		solution.steps = dp[goalBoard].steps;
-		return solution;
-	}
-	*/
 
 	Solution dynamicProgramming(const Board& initialBoard, const Array<Pattern>& patterns, double timeLimit) {
 		struct State {
@@ -284,57 +209,6 @@ namespace Algorithm {
 		return solution;
 	}
 
-	/*
-	Solution rowByRowGreedy(const Board& initialBoard, const Array<Pattern>& patterns) {
-		Board currentBoard = initialBoard;
-		Solution solution;
-		solution.score = 0;
-
-		for (int32 targetRow = 0; targetRow < currentBoard.height; ++targetRow) {
-			while (!currentBoard.isRowMatched(targetRow)) {
-				bool improved = false;
-				int32 bestDiff = currentBoard.calculateDifferenceByRow(targetRow);
-				Pattern bestPattern = patterns[0];
-				Point bestPos(0, 0);
-				int32 bestDirection = 0;
-
-				for (const auto& pattern : patterns) {
-					if (pattern.grid.height() >= Max(initialBoard.grid.height(), initialBoard.grid.width())) continue;
-					int32 minY = (targetRow == 0) ? -int32(pattern.grid.height()) + 1 : targetRow;
-					int32 maxY = targetRow;
-
-					for (int32 y = minY; y <= maxY; ++y) {
-						for (int32 x = -int32(pattern.grid.width()) + 1; x < currentBoard.width; ++x) {
-							for (int32 dir = 0; dir < 4; ++dir) {
-								Board newBoard = currentBoard.applyPatternCopy(pattern, Point(x, y), dir);
-								int32 newDiff = newBoard.calculateDifferenceByRow(targetRow);
-								if (newDiff < bestDiff) {
-									bestDiff = newDiff;
-									bestPattern = pattern;
-									bestPos = Point(x, y);
-									bestDirection = dir;
-									improved = true;
-								}
-							}
-						}
-					}
-				}
-
-				if (improved) {
-					currentBoard.apply_pattern(bestPattern, bestPos, bestDirection);
-					solution.steps.push_back(std::make_tuple(bestPattern, bestPos, bestDirection));
-					solution.score += bestPattern.p;
-					//solution.score +=
-				}
-				else {
-					// 改善できない場合、次の行に移動
-					break;
-				}
-			}
-		}
-
-		return solution;
-	}*/
 
 	Solution rowByRowGreedy(const Board& initialBoard, const Array<Pattern>& patterns) {
 		Board currentBoard = initialBoard;
@@ -390,56 +264,6 @@ namespace Algorithm {
 
 		return solution;
 	}
-
-	/*
-	Solution rowByRowAdvancedGreedy(const Board& initialBoard, const Array<Pattern>& patterns) {
-		Board currentBoard = initialBoard;
-		Solution solution;
-		solution.score = 0;
-
-		for (int32 targetRow = 0; targetRow < currentBoard.height; ++targetRow) {
-			while (!currentBoard.isRowMatched(targetRow)) {
-				bool improved = false;
-				int32 bestDiff = currentBoard.calculateAdvancedDifferenceByRow(targetRow);
-				Pattern bestPattern = patterns[0];
-				Point bestPos(0, 0);
-				int32 bestDirection = 0;
-
-				for (const auto& pattern : patterns) {
-					if (pattern.grid.height() >= Max(initialBoard.grid.height(), initialBoard.grid.width())) continue;
-					int32 minY = (targetRow == 0) ? -int32(pattern.grid.height()) + 1 : targetRow;
-					int32 maxY = targetRow;
-
-					for (int32 y = minY; y <= maxY; ++y) {
-						for (int32 x = -int32(pattern.grid.width()) + 1; x < currentBoard.width; ++x) {
-							for (int32 dir = 0; dir < 4; ++dir) {
-								Board newBoard = currentBoard.applyPatternCopy(pattern, Point(x, y), dir);
-								int32 newDiff = newBoard.calculateAdvancedDifferenceByRow(targetRow);
-								if (newDiff < bestDiff) {
-									bestDiff = newDiff;
-									bestPattern = pattern;
-									bestPos = Point(x, y);
-									bestDirection = dir;
-									improved = true;
-								}
-							}
-						}
-					}
-				}
-
-				if (improved) {
-					currentBoard.apply_pattern(bestPattern, bestPos, bestDirection);
-					solution.steps.push_back(std::make_tuple(bestPattern, bestPos, bestDirection));
-					solution.score += bestPattern.p;
-				}
-				else {
-					break;
-				}
-			}
-		}
-
-		return solution;
-	}*/
 
 
 	Solution rowByRowAdvancedGreedy(const Board& initialBoard, const Array<Pattern>& patterns) {
@@ -500,21 +324,46 @@ namespace Algorithm {
 		Solution solution;
 		for (int32 x : step(initialBoard.grid.width())) {
 			for (int32 y : step(initialBoard.grid.height())) {
-				Console << U"y,x: {},{}"_fmt(y, x);
 				if (board.grid[y][x] == initialBoard.goal[y][x]) {
 					continue;
 				}
-
+				bool found = false;
+				Console << y << U", " << x;
 				for (int32 dx = 1; x + dx < board.grid.width(); dx++) {
 					if (board.grid[y][x + dx] == initialBoard.goal[y][x]) {
-						Console << U"x+dx: {}"_fmt(x + dx);
+						found = true;
+
 						while (dx--) {
 							solution.steps.push_back(std::make_tuple(patterns[0], Point(x, y), 2));
 							// board = board.applyPatternCopy(patterns[0], Point(i, j), 2);
 							board.apply_pattern(patterns[0], Point(x, y), 2);
-							Console << board.grid;
+
 						}
+						found = 1;
 						break;
+					}
+				}
+
+				if (!found) {
+					//continue;
+					break;
+					for (int32 dy = 1; y + dy < board.grid.height(); dy++) {
+						bool foundAlternative = false;
+						for (int32 dx = 1; x + dx < board.grid.width(); dx++) {
+							if (board.grid[y + dy][x + dx] == initialBoard.grid[y][x]) {
+								foundAlternative = true;
+								for (int32 i : step(dy)) {
+									solution.steps.push_back(std::make_tuple(patterns[0], Point(x + dx, y), 0));
+									board.apply_pattern(patterns[0], Point(x, y + dy), 0);
+								}
+								for (int32 j : step(dx)) {
+									solution.steps.push_back(std::make_tuple(patterns[0], Point(x, y), 2));
+									board.apply_pattern(patterns[0], Point(x, y), 0);
+								}
+								break;
+							}
+						}
+						if (foundAlternative) break;
 					}
 				}
 			}
@@ -522,12 +371,12 @@ namespace Algorithm {
 
 		for (int32 y : step(initialBoard.grid.height())) {
 			for (int32 x : step(initialBoard.grid.width())) {
-				Console << U"y,x: {},{}"_fmt(y, x);
+
 				if (board.grid[y][x] == initialBoard.goal[y][x]) {
 					continue;
 				}
 				for (int32 dy = 1; y + dy < board.grid.height(); dy++) {
-					Console << U"y+dy: {}"_fmt(y + dy);
+
 					if (board.grid[y + dy][x] == initialBoard.goal[y][x]) {
 						while (dy--) {
 							solution.steps.push_back(std::make_tuple(patterns[0], Point(x, y), 0));
@@ -538,7 +387,7 @@ namespace Algorithm {
 				}
 			}
 		}
-
+		solution.grid = board.grid;
 		return solution;
 	}
 
@@ -587,44 +436,6 @@ namespace Algorithm {
 		return solution;
 	}
 
-	/*Solution partialBFS(const Board& initialBoard, const Array<Pattern>& patterns, const int32& sy, const int32& sx) {
-		Solution solution;
-		int32 height = initialBoard.grid.height() - sy;
-		int32 width = initialBoard.grid.width() - sx;
-		Grid<int32> partialGrid = initialBoard.partialGrid(sy, sx);
-		Grid<int32> partialGoal = initialBoard.partialGoal(sy, sx);
-		Board partialBoard = {height, width};
-		partialBoard.grid = partialGrid;
-		partialBoard.goal = partialGoal;
-
-		std::queue<Board> que;
-		que.push(partialBoard);
-		std::map<Grid<int32>, bool>  seen;
-		seen[partialGrid] = 1;
-		// pattern[0]で固定
-		Pattern pattern = patterns[0];
-		while (!que.empty()) {
-			Board board = que.front();
-			que.pop();
-
-			for (int32 i = 0; i < height; i++) {
-				for (int32 j = 0; j < width; j++) {
-					for (int32 dir = 0; dir < 4; dir++) {
-						Board nextBoard = board.applyPatternCopy(pattern, Point(i, j), dir);
-						if (seen[nextBoard.grid]) continue;
-						que.push(nextBoard);
-					}
-				}
-			}
-
-		}
-		for (int32 y = sy; y < initialBoard.grid.height(); y++) {
-			for (int32 x = sx; x < initialBoard.grid.width(); x++) {
-
-			}
-		}
-	}
-	*/
 
 	Solution simulatedAnnealing(const Board& initialBoard, const Array<Pattern>& patterns, int32 sy, int32 sx,
 	 int32 number, double startTemp, double endTemp) {
@@ -650,8 +461,16 @@ namespace Algorithm {
 		const int32 INF = 1 << 31;
 
 
-
+		auto startTime = std::chrono::high_resolution_clock::now();
+		const double timeLimit = 5;
 		for (int32 i = 0; i < number; i++) {
+			auto currentTime = std::chrono::high_resolution_clock::now();
+			double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+
+			if (elapsedTime > timeLimit) {
+				break;
+			}
+
 			Console << U"time : {} board:\n{} "_fmt(i, partialBoard.grid);
 			Solution newSolution = timeLimitedGreedy(partialBoard, patterns, 1);
 			Console << U"size: " << newSolution.steps.size();
@@ -679,6 +498,115 @@ namespace Algorithm {
 		return solution;
 	}
 
+	Solution dijkstra(const Board& initialBoard, const Array<Pattern>& patterns) {
+		Solution solution;
+		Board board = initialBoard;
+		// 孤立しているマスを探す
+		std::queue<Point> pos;
+		for (int32 y : step(initialBoard.grid.height())) {
+			if (pos.size() > 0) break;
+			for (int32 x : step(initialBoard.goal.width())) {
+				if (initialBoard.grid[y][x] != initialBoard.goal[y][x]) {
+					pos.push(Point(x, y));
+					break;
+				}
+			
+			}
+		}
+
+		while (!pos.empty()) {
+			Point nextPos = pos.front();
+			pos.pop();
+
+			Point actualPos = board.BFS(nextPos, board.goal[nextPos.y][nextPos.x]);
+			Console << U"next: {}, actual:{}"_fmt(nextPos, actualPos);
+			int32 dy = actualPos.y - nextPos.y, dx = actualPos.x - nextPos.x;
+			Point applyPos = Point(nextPos.x + dx, nextPos.y);
+			Console << U"dy, dx:{},{}"_fmt(dy, dx);
+			for (int32 i : step(abs(dy))) {
+				solution.steps.push_back(std::make_tuple(patterns[0], applyPos, 0));
+				board.apply_pattern(patterns[0], applyPos, 0);
+			}
+			// return solution;
+			applyPos = nextPos;
+			int32 dirX = dx < 0 ? 3 : 2;
+			for (int32 i : step(abs(dx))) {
+				solution.steps.push_back(std::make_tuple(patterns[0], applyPos, dirX));
+				board.apply_pattern(patterns[0], applyPos, dirX);
+			}
+			// 一旦1度で終わっとく(デバッグ)
+			break;
+		}
+		solution.grid = board.grid;
+		return solution;
+	}
+	// y行 swap(i,j)
+	Solution swap(const Board& initialBoard, const Array<Pattern>& patterns, int32 i, int32 j, int32 y) {
+		Solution solution;
+
+		// swap
+		for (int32 left : step(i)) {
+			solution.steps.push_back(std::make_tuple(patterns[0], Point(0, y), 2));
+		}
+		for (int32 left : step(j - i - 1)) {
+			solution.steps.push_back(std::make_tuple(patterns[0], Point(1, y), 2));
+		}
+		for (int32 right : step(1)) {
+			solution.steps.push_back(std::make_tuple(patterns[0], Point(1, y), 3));
+		}
+		for (int32 left : step(initialBoard.grid.width() - j)) {
+			solution.steps.push_back(std::make_tuple(patterns[0], Point(1, y), 2));
+		}
+		for (int32 right : step(i)) {
+			solution.steps.push_back(std::make_tuple(patterns[0], Point(i, y), 3));
+		}
+		return solution;
+	}
+
+	// そのうちswapに関しては全て書き出してhashとかで保持しておけばよさそう
+
+	Solution horizontalSwapSort(const Board& initialBoard, const Array<Pattern>& patterns) {
+		Board board = initialBoard;
+		Solution solution;
+		// swap対象
+		for (int32 y : step(board.grid.height())) {
+			// 正しくない要素を探索
+			std::vector<std::pair<int32, int32>> targets = board.sortToMatchPartially(y);
+			for (std::pair<int32, int32> target : targets) {
+				const auto [i, j] = target;
+				if (i == -1 || j == -1) continue;
+				// Console << U"i, j{}"_fmt(Point(i, j));
+				// Console << U"before:" << board.grid;
+
+				int32 tmp = board.grid[y][i];
+				board.grid[y][i] = board.grid[y][j];
+				board.grid[y][j] = tmp;
+				// swap
+				
+				
+				for (int32 left : step(i)) {
+					solution.steps.push_back(std::make_tuple(patterns[0], Point(0, y), 2));
+				}
+				for (int32 left : step(j - i - 1)) {
+					solution.steps.push_back(std::make_tuple(patterns[0], Point(1, y), 2));
+				}
+				for (int32 right : step(1)) {
+					solution.steps.push_back(std::make_tuple(patterns[0], Point(1, y), 3));
+				}
+				for (int32 left : step(board.grid.width() - j)) {
+					solution.steps.push_back(std::make_tuple(patterns[0], Point(1, y), 2));
+				}
+				for (int32 right : step(i)) {
+					solution.steps.push_back(std::make_tuple(patterns[0], Point(i, y), 3));
+				}
+				
+				// Console << U"after:" << board.grid;
+				// return solution; // debug
+			}
+		}
+		solution.grid = board.grid;
+		return solution;
+	}
 
 	Solution solve(Type algorithmType, const Board& initialBoard, const Array<Pattern>& patterns) {
 		Point p = Cursor::Pos();
@@ -703,7 +631,11 @@ namespace Algorithm {
 			return diagonalSearch(initialBoard, patterns);
 		case Type::SimulatedAnnealing:
 			if (sy < 0 || sy >= initialBoard.grid.height() || sx < 0 || sx >= initialBoard.grid.width()) return Solution();
-			return simulatedAnnealing(initialBoard, patterns, p.y / 30, p.x / 30);
+			return simulatedAnnealing(initialBoard, patterns, p.y / 7, p.x / 7); // セルのサイズで割る
+		case Type::Dijkstra:
+			return dijkstra(initialBoard, patterns);
+		case Type::HorizontalSwapSort:
+			return horizontalSwapSort(initialBoard, patterns);
 		default:
 			throw Error(U"Unknown algorithm type");
 		}

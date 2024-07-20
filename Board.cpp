@@ -92,7 +92,7 @@ Board Board::applyPatternCopy(const Pattern& pattern, Point pos, int32 direction
 }
 
 void Board::draw() const {
-	const int32 cellSize = 30;
+	const int32 cellSize = Min(1920 / grid.width(), 1080 / grid.height());
 	const ColorF gridColor(0.5, 0.5, 0.5);  // グリッドの色（灰色）
 	const ColorF cellColor(0.8, 0.9, 1.0);  // セルの色（薄い青）
 
@@ -285,23 +285,116 @@ int32 Board::calculateAdvancedDifferenceByRow(int32 row, const Grid<int32>& othe
 Grid<int32> Board::partialGrid(int32 sy, int32 sx) const {
 	Grid<int32> partialGrid(width - sx, height - sy);
 	Console << height - sy << U", " << width - sx;
-	for (int32 i = sy; i < height; i++ ) {
+	for (int32 i = sy; i < height; i++) {
 		for (int32 j = sx; j < width; j++) {
-		partialGrid[i - sy][j - sx] = grid[i][j];
-		Console << i - sy << U", " << j - sx;
+			partialGrid[i - sy][j - sx] = grid[i][j];
+			Console << i - sy << U", " << j - sx;
+		}
 	}
-}
-return partialGrid;
+	return partialGrid;
 }
 
 Grid<int32> Board::partialGoal(int32 sy, int32 sx) const {
 	Grid<int32> partialGoal(width - sx, height - sy);
 	Console << height - sy << U", " << width - sx;
-		for (int32 i = sy; i < height; i++) {
-			for (int32 j = sx; j < width; j++) {
-				partialGoal[i - sy][j - sx] = goal[i][j];
-				Console << i - sy << U", " << j - sx;
+	for (int32 i = sy; i < height; i++) {
+		for (int32 j = sx; j < width; j++) {
+			partialGoal[i - sy][j - sx] = goal[i][j];
+			Console << i - sy << U", " << j - sx;
+		}
+	}
+	return partialGoal;
+}
+
+Point Board::BFS(Point start, int32 target) const {
+	int32 sy = start.y, sx = start.x;
+	Point pos = start;
+	int32 minDist = 1e9;
+	std::queue<Point> que;
+	que.push(Point(sx, sy));
+	Grid<int32> dist(grid.height(), grid.width(), -1);
+	int32 dy[] = { 1, 0, -1, 0 }, dx[] = { 0, 1, 0, -1 };
+	dist[sy][sx] = 0;
+	while (!que.empty()) {
+		Point nextPos = que.front();
+		que.pop();
+		int32 y = nextPos.y, x = nextPos.x;
+
+		Console << nextPos;
+
+		for (int32 i : step(4)) {
+			int32 ny = dy[i] + y, nx = dx[i] + x;
+			Console << U"ny, nx:" << ny << U",  " << nx;
+			if (ny < 0 || ny >= grid.height() || nx < 0 || nx >= grid.width()) continue;
+			if (dist[ny][nx] != -1) continue;
+
+			dist[ny][nx] = dist[y][x] + 1;
+			Console << U"dist::" << dist[ny][nx];
+			que.push(Point(nx, ny));
+
+			if (goal[sy][sx] == grid[ny][nx] && grid[ny][nx] != goal[ny][nx]) {
+				return Point(nx, ny);
+				if (minDist > dist[ny][nx]) {
+					minDist = dist[ny][nx];
+					pos = Point(nx, ny);
+				}
+			}
+
+		}
+	}
+	Console << U"dist: " << dist;
+	return pos;
+}
+
+std::vector<std::pair<int32, int32>> Board::sortToMatchPartially(int32 targetRow)const {
+	Array<int32> A(width), B(width);
+	for (int32 i : step(width)) {
+		A[i] = grid[targetRow][i];
+		B[i] = goal[targetRow][i];
+	}
+	std::vector<std::pair<int32, int32>> swaps;
+	std::unordered_map<int32, int32> countA, countB;
+
+	// 各要素の出現回数をカウント
+	for (int32 num : A) countA[num]++;
+	for (int32 num : B) countB[num]++;
+
+	// 第1段階: 共通要素を正しい位置に配置
+	for (int32 i = 0; i < A.size(); ++i) {
+		if (A[i] != B[i] && countA[B[i]] > 0) {
+			for (int32 j = i + 1; j < A.size(); ++j) {
+				if (A[j] == B[i]) {
+					swaps.emplace_back(i, j);  // インデックスを記録
+					std::swap(A[i], A[j]);
+					break;
+				}
 			}
 		}
-	return partialGoal;
+		if (countA[B[i]] > 0) countA[B[i]]--;
+	}
+
+	// 第2段階: 残りの要素をできるだけBの順序に近づける
+	std::vector<int32> remainingB;
+	for (int32 num : B) {
+		if (countB[num] > 0) {
+			remainingB.push_back(num);
+			countB[num]--;
+		}
+	}
+
+	int32 j = 0;
+	for (int32 i = 0; i < A.size(); ++i) {
+		if (std::find(B.begin(), B.end(), A[i]) == B.end()) {
+			while (j < remainingB.size() && std::find(A.begin(), A.end(), remainingB[j]) != A.end()) {
+				j++;
+			}
+			if (j < remainingB.size()) {
+				swaps.emplace_back(i, -1);  // -1は新しい値を示す特別なインデックス
+				A[i] = remainingB[j];
+				j++;
+			}
+		}
+	}
+
+	return swaps;
 }
