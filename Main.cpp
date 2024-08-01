@@ -38,7 +38,10 @@ std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 }
 
 void Main() {
-	Window::Resize(1920, 1080);
+	// Window::Resize(1920, 1080);
+	const auto monitor = System::EnumerateMonitors()[0];
+	
+	Window::Resize(monitor.fullscreenResolution); 
 	FontAsset::Register(U"Cell", 20);
 	FontAsset::Register(U"Button", 30, Typeface::Bold);
 	Scene::SetBackground(ColorF{ 0.8, 1.0, 0.9 });
@@ -68,9 +71,11 @@ void Main() {
 
 	double progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
 
+	Algorithm::Solution answer;
+
 	while (System::Update()) {
 
-
+		
 
 
 		if (manualButton.leftClicked()) {
@@ -89,6 +94,15 @@ void Main() {
 			}
 		}
 		if (autoButton.leftClicked() || KeyEnter.down()) {
+			if (board.is_goal()) {
+				board = initializeFromJSON(U"input.json").first;
+				for (const auto& [solvePattern, solvePos, solveDir] : answer.steps) {
+					
+					board.apply_pattern(solvePattern, solvePos, solveDir);
+					board.draw();
+					System::Update();
+				}
+			}
 			int32 diff = board.calculateDifference(board.grid);
 			int32 height = board.grid.height(), width = board.grid.width();
 			auto startTime = std::chrono::high_resolution_clock::now();
@@ -103,6 +117,9 @@ void Main() {
 							board.grid[h][w] = solution.grid[h][w];
 						}
 					}
+					for (auto x : solution.steps) {
+						answer.steps.push_back(x);
+					}
 				}
 				// 変化がない時
 				if (diff = board.calculateDifference(board.grid)) {
@@ -113,6 +130,9 @@ void Main() {
 							for (int32 w : step(width)) {
 								board.grid[h][w] = solution.grid[h][w];
 							}
+						}
+						for (auto x : solution.steps) {
+							answer.steps.push_back(x);
 						}
 						lastDiff = diff;
 						diff = board.calculateDifference(board.grid);
@@ -212,5 +232,6 @@ void Main() {
 			FontAsset(U"Cell")(U"Goal Reached!").drawAt(Scene::Center(), Palette::Red);
 		}
 
+		
 	}
 }

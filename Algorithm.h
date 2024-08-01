@@ -41,6 +41,8 @@ namespace Algorithm {
 	Solution horizontalSwapSort(const Board& initialBoard, const Array<Pattern>& patterns);
 	std::vector<std::pair<int32, int32>> sortToMatchPartially(Array<int32>& A, const Array<int32>& B);
 	Solution swap(const Board& initialBoard, const Array<Pattern>& patterns, int32 i, int32 j, int32 y);
+
+
 	Solution solve(Type algorithmType, const Board& initialBoard, const Array<Pattern>& patterns);
 
 
