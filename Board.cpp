@@ -324,12 +324,12 @@ Point Board::BFS(Point start, int32 target) const {
 
 		for (int32 i : step(4)) {
 			int32 ny = dy[i] + y, nx = dx[i] + x;
-			Console << U"ny, nx:" << ny << U",  " << nx;
+			// Console << U"ny, nx:" << ny << U",  " << nx;
 			if (ny < 0 || ny >= grid.height() || nx < 0 || nx >= grid.width()) continue;
 			if (dist[ny][nx] != -1) continue;
 
 			dist[ny][nx] = dist[y][x] + 1;
-			Console << U"dist::" << dist[ny][nx];
+			// Console << U"dist::" << dist[ny][nx];
 			que.push(Point(nx, ny));
 
 			if (goal[sy][sx] == grid[ny][nx] && grid[ny][nx] != goal[ny][nx]) {
@@ -337,12 +337,12 @@ Point Board::BFS(Point start, int32 target) const {
 				if (minDist > dist[ny][nx]) {
 					minDist = dist[ny][nx];
 					pos = Point(nx, ny);
-				}
 			}
+				}
 
 		}
 	}
-	Console << U"dist: " << dist;
+	// Console << U"dist: " << dist;
 	return pos;
 }
 

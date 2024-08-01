@@ -94,7 +94,7 @@ void Main() {
 			auto startTime = std::chrono::high_resolution_clock::now();
 			while (diff) {
 				Algorithm::Solution solution;
-
+				if (KeySpace.down()) { break; }
 				for (int32 i : step(2)) {
 					Algorithm::Type algo = i % 2 ? Algorithm::Type::HorizontalSwapSort : Algorithm::Type::Dijkstra;
 					solution = Algorithm::solve(algo, board, patterns);
@@ -106,11 +106,17 @@ void Main() {
 				}
 				// 変化がない時
 				if (diff = board.calculateDifference(board.grid)) {
-					solution = Algorithm::solve(Algorithm::Type::OneByOne, board, patterns);
-					for (int32 h : step(height)) {
-						for (int32 w : step(width)) {
-							board.grid[h][w] = solution.grid[h][w];
+					int32 lastDiff = -1;
+					while (lastDiff != diff) {
+						solution = Algorithm::solve(Algorithm::Type::OneByOne, board, patterns);
+						for (int32 h : step(height)) {
+							for (int32 w : step(width)) {
+								board.grid[h][w] = solution.grid[h][w];
+							}
 						}
+						lastDiff = diff;
+						diff = board.calculateDifference(board.grid);
+						Console << U"one by one";
 					}
 				}
 				diff = board.calculateDifference(board.grid);
