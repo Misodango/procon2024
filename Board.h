@@ -31,6 +31,7 @@ public:
 
 	// 等価性比較のサポート
 	bool operator==(const Board& other) const;
+	bool operator!=(const Board& other) const;
 
 	int32 calculateDifferenceByRow(int32 row, const Grid<int32>& otherGrid) const;
 	bool isRowMatched(int32 row, const Grid<int32>& otherGrid) const;
@@ -45,9 +46,9 @@ public:
 
 	
 	Point BFS(Point start, int32 target) const;
-
+	Point BFSbyPopcount(Point start, int32 target) const;
 	std::vector<std::pair<int32, int32>> sortToMatchPartially(int32 targetRow) const;
-	
+
 
 private:
 	void shift_up(const Array<Point>& removed_cells);
@@ -55,14 +56,37 @@ private:
 	void shift_left(const Array<Point>& removed_cells);
 	void shift_right(const Array<Point>& removed_cells);
 	int32 calculateDistance(int32 x1, int32 y1, int32 x2, int32 y2) const;
+	
 };
 
 // std::unordered_mapでBoardをキーとして使用するためのハッシュ関数
+/*
 namespace std {
 	template <>
 	struct hash<Board> {
 		size_t operator()(const Board& b) const {
 			return b.hash();
+		}
+	};
+}
+*/
+
+namespace std {
+	template <>
+	struct hash<Board> {
+		size_t operator()(const Board& b) const {
+			size_t seed = 0;
+			for (int y = 0; y < b.height; y++) {
+				for (int x = 0; x < b.width; x++) {
+					seed ^= std::hash<int32>()(b.grid[y][x]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+				}
+			}
+			for (int y = 0; y < b.height; y++) {
+				for (int x = 0; x < b.width; x++) {
+					seed ^= std::hash<int32>()(b.goal[y][x]) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+				}
+			}
+			return seed;
 		}
 	};
 }

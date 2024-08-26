@@ -140,125 +140,369 @@ namespace Algorithm {
 
 		return bestSolution; // 最良の解を返す（ゴールに到達していなくても）
 	}
+	/**
+	* @brief 二次元セグメント木
+	* @docs docs/data-structure-2d/2d-segment-tree.md
+	*/
+	/*
+	class SegmentTree2D
+	{
+	private:
+		int32 id(int32 h, int32 w) const { return h * 2 * W + w; }
 
+	public:
+		int32 H, W;
+		Array<int32> seg;
+		std::function<int32(int32, int32)> f;
+		int32 I;
+
+		SegmentTree2D(int32 h, int32 w, std::function<int32(int32, int32)> _f, const int32& i)
+			: f(_f), I(i)
+		{
+			init(h, w);
+		}
+
+		void init(int32 h, int32 w)
+		{
+			H = W = 1;
+			while (H < h) H <<= 1;
+			while (W < w) W <<= 1;
+			seg.resize(4 * H * W, I);
+		}
+
+		void set(int32 h, int32 w, const int32& x) { seg[id(h + H, w + W)] = x; }
+
+		void build()
+		{
+			for (int32 w = W; w < 2 * W; w++)
+			{
+				for (int32 h = H - 1; h; h--)
+				{
+					seg[id(h, w)] = f(seg[id(2 * h + 0, w)], seg[id(2 * h + 1, w)]);
+				}
+			}
+			for (int32 h = 0; h < 2 * H; h++)
+			{
+				for (int32 w = W - 1; w; w--)
+				{
+					seg[id(h, w)] = f(seg[id(h, 2 * w + 0)], seg[id(h, 2 * w + 1)]);
+				}
+			}
+		}
+
+		int32 get(int32 h, int32 w) const { return seg[id(h + H, w + W)]; }
+		int32 operator()(int32 h, int32 w) const { return seg[id(h + H, w + W)]; }
+
+		void update(int32 h, int32 w, const int32& x)
+		{
+			h += H, w += W;
+			seg[id(h, w)] = x;
+			for (int32 i = h >> 1; i; i >>= 1)
+			{
+				seg[id(i, w)] = f(seg[id(2 * i + 0, w)], seg[id(2 * i + 1, w)]);
+			}
+			for (; h; h >>= 1)
+			{
+				for (int32 j = w >> 1; j; j >>= 1)
+				{
+					seg[id(h, j)] = f(seg[id(h, 2 * j + 0)], seg[id(h, 2 * j + 1)]);
+				}
+			}
+		}
+
+		int32 _inner_query(int h, int w1, int w2)
+		{
+			int32 res = I;
+			for (; w1 < w2; w1 >>= 1, w2 >>= 1)
+			{
+				if (w1 & 1) res = f(res, seg[id(h, w1)]), w1++;
+				if (w2 & 1) --w2, res = f(res, seg[id(h, w2)]);
+			}
+			return res;
+		}
+
+		int32 query(int h1, int w1, int h2, int w2)
+		{
+			if (h1 >= h2 || w1 >= w2) return I;
+			int32 res = I;
+			h1 += H, h2 += H, w1 += W, w2 += W;
+			for (; h1 < h2; h1 >>= 1, h2 >>= 1)
+			{
+				if (h1 & 1) res = f(res, _inner_query(h1, w1, w2)), h1++;
+				if (h2 & 1) --h2, res = f(res, _inner_query(h2, w1, w2));
+			}
+			return res;
+		}
+	};
+	class CountSegmentTree2D
+	{
+	private:
+		Array<SegmentTree2D> trees;
+
+	public:
+		CountSegmentTree2D(int32 h, int32 w)
+			: trees(4)
+		{
+			auto f = [](int32 a, int32 b) { return a + b; };
+			const int32 identity = 0;
+
+			for (auto& tree : trees)
+			{
+				tree = SegmentTree2D(h, w, f, identity);
+			}
+		}
+
+		void set(int32 h, int32 w, int32 value)
+		{
+			assert(0 <= value && value < 4);
+			for (int32 i = 0; i < 4; ++i)
+			{
+				trees[i].set(h, w, (i == value) ? 1 : 0);
+			}
+		}
+
+		void build()
+		{
+			for (auto& tree : trees)
+			{
+				tree.build();
+			}
+		}
+
+		Array<int32> query(int32 h1, int32 w1, int32 h2, int32 w2)
+		{
+			Array<int32> result(4);
+			for (int32 i = 0; i < 4; ++i)
+			{
+				result[i] = trees[i].query(h1, w1, h2, w2);
+			}
+			return result;
+		}
+	};
+	*/
+
+
+	class SegmentTree {
+	private:
+		std::vector<std::pair<int, std::pair<int32, int32>>> tree;
+		int32 n;
+		int32 INF = 1e9;
+	public:
+		SegmentTree(int32 size) {
+			n = 1;
+			while (n < size) n *= 2;
+			tree.resize(2 * n, { INF, {-1, -1} });
+		}
+
+		void update(int32 idx, int32 val, int32 x, int32 y) {
+			idx += n;
+			tree[idx] = { val, {x, y} };
+			while (idx > 1) {
+				idx /= 2;
+				tree[idx] = min(tree[2 * idx], tree[2 * idx + 1]);
+			}
+		}
+
+		std::pair<int32, std::pair<int32, int32>> query(int32 l, int32 r) {
+			l += n; r += n;
+			std::pair<int32, std::pair<int32, int32>> res = { INF, {-1, -1} };
+			while (l < r) {
+				if (l & 1) res = min(res, tree[l++]);
+				if (r & 1) res = min(res, tree[--r]);
+				l /= 2; r /= 2;
+			}
+			return res;
+		}
+	};
 
 	Solution dynamicProgramming(const Board& initialBoard, const Array<Pattern>& patterns, double timeLimit) {
-		struct State {
-			int32 score;
-			std::vector<std::tuple<Pattern, Point, int32>> steps;
+		// dp max step: HWlogHlogW
+		// dpの遷移の方法で焼きなましができる
+		// 累積和にはセグ木を使う
+		Solution solution;
+		Board board = initialBoard;
+		int32 h = board.grid.height(), w = board.grid.width();
 
-			State(int32 s = std::numeric_limits<int32>::max()) : score(s) {}
-		};
-		const int32 tileCount = initialBoard.grid.height() * initialBoard.grid.width();
-		std::unordered_map<Board, State> dp;
-		dp[initialBoard] = State(tileCount - initialBoard.calculateAdvancedDifference(initialBoard.grid));
-
-		std::queue<Board> q;
-		q.push(initialBoard);
-
-		Board goalBoard = initialBoard;
-		int32 bestScore = std::numeric_limits<int32>::max();
-
-		auto startTime = std::chrono::high_resolution_clock::now();
-
-		while (!q.empty()) {
-			auto currentTime = std::chrono::high_resolution_clock::now();
-			double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
-
-			if (elapsedTime > timeLimit) {
-				break;
-			}
-
-			Board currentBoard = q.front();
-			q.pop();
-
-			if (currentBoard.is_goal()) {
-				if (dp[currentBoard].score < bestScore) {
-					goalBoard = currentBoard;
-					bestScore = dp[currentBoard].score;
-				}
-				continue;
-			}
-
-			for (const auto& pattern : patterns) {
-				if (pattern.grid.height() >= Max(currentBoard.grid.height(), currentBoard.grid.width())) continue;
-				for (int32 y = -int32(pattern.grid.height()) + 1; y < currentBoard.height; ++y) {
-					for (int32 x = -int32(pattern.grid.width()) + 1; x < currentBoard.width; ++x) {
-						for (int32 dir = 0; dir < 4; ++dir) {
-							Board newBoard = currentBoard.applyPatternCopy(pattern, Point(x, y), dir);
-							int32 newScore = tileCount - newBoard.calculateAdvancedDifference(newBoard.grid);
-							if (dp.find(newBoard) == dp.end() || newScore < dp[newBoard].score) {
-								dp[newBoard] = State(newScore);
-								dp[newBoard].steps = dp[currentBoard].steps;
-								dp[newBoard].steps.push_back(std::make_tuple(pattern, Point(x, y), dir));
-								q.push(newBoard);
+		while (!board.is_goal()) {
+			for (int32 x : step(w)) {
+				int32 beforeSize = solution.steps.size();
+				for (int32 y : step(h)) {
+					if (board.grid[y][x] == board.goal[y][x]) continue;
+					Point nearestPoint = board.BFSbyPopcount(Point(x, y), board.goal[y][x]);
+					int32 dy = nearestPoint.y - y, dx = nearestPoint.x - x;
+					Console << U"sx, sy: " << Point(x, y);
+					Console << U"dx dy:" << Point(dx, dy);
+					if (dy == 0 && dx == 0) continue;
+					// dy を愚直に処理するとき
+					for (int32 bit = 0; bit <= 8; bit++) {
+						if ((abs(dy) >> bit) & 1) {
+							auto pattern = patterns[0];
+							if (bit == 0) {
+								pattern = patterns[0];
 							}
+							else {
+								// idx: 3*(bit-1)+1
+								pattern = patterns[3 * (bit - 1) + 1];
+							}
+
+							int32 dir = dy < 0; // dy > 0 => 上移動
+							board.apply_pattern(pattern, Point(x + dx, y), dir);
+							solution.steps.push_back(std::make_tuple(pattern, Point(x + dx, y), dir));
 						}
 					}
+
+					// マイナス座標も許容することで1手で処理できる y == 0二のみ有効
+					// 未完成
+					/*
+					if (dy > 0) {
+						auto pattern = patterns[24];
+						board.apply_pattern(pattern, Point(x + dx, y - dy - 256), 0);
+						solution.steps.push_back(std::make_tuple(pattern, Point(x + dx, y - dy - 256), 0));
+					}
+					else if (dy < 0) {
+						auto pattern = patterns[24];
+						board.apply_pattern(pattern, Point(x + dx, y + dy + 1), 1);
+						solution.steps.push_back(std::make_tuple(pattern, Point(x + dx, y + dy + 1), 1));
+					}
+					*/
+					for (int32 bit = 0; bit <= 8; bit++) {
+						if ((dx >> bit) & 1) {
+							auto pattern = patterns[0];
+							if (bit == 0) {
+								pattern = patterns[0];
+							}
+							else {
+								pattern = patterns[3 * (bit - 1) + 1];
+
+							}
+							board.apply_pattern(pattern, Point(x, y), 2);
+							solution.steps.push_back(std::make_tuple(pattern, Point(x, y), 2));
+						}
+					}
+					solution.grid = board.grid;
+					return solution;
+					// break;
 				}
+				// int32 afterSize = solution.steps.size();
+				// if (beforeSize < afterSize) continue;
 			}
 		}
-
-		if (bestScore == std::numeric_limits<int32>::max()) {
-			return Solution(); // No solution found
-		}
-
-		Solution solution;
-		solution.score = bestScore;
-		solution.steps = dp[goalBoard].steps;
 		return solution;
+
 	}
 
 
 	Solution rowByRowGreedy(const Board& initialBoard, const Array<Pattern>& patterns) {
-		Board currentBoard = initialBoard;
+		static const int32 width = initialBoard.grid.width(), height = initialBoard.grid.height();
+		Board board = initialBoard;
 		Solution solution;
-		solution.score = 0;
+		static Grid<int32> distances(width * height, width * height);
+		static Grid<Array<std::pair<int32, Point>>> sortedDistances(width, height); // (y, x) に近いものを順に入れたい
 
-		for (int32 targetRow = 0; targetRow < currentBoard.height; ++targetRow) {
-			while (!currentBoard.isRowMatched(targetRow, currentBoard.grid)) {
-				bool improved = false;
-				int32 bestDiff = currentBoard.calculateDifferenceByRow(targetRow, currentBoard.grid);
-				Pattern bestPattern = patterns[0];
-				Point bestPos(0, 0);
-				int32 bestDirection = 0;
+		static bool initialized;
 
-				for (const auto& pattern : patterns) {
-					if (pattern.grid.height() >= Max(initialBoard.grid.height(), initialBoard.grid.width())) continue;
-					int32 minY = (targetRow == 0) ? -int32(pattern.grid.height()) + 1 : targetRow;
-					int32 maxY = targetRow;
+		if (initialized) {
+			Console << U"calculated";
 
-					for (int32 y = minY; y <= maxY; ++y) {
-						for (int32 x = -int32(pattern.grid.width()) + 1; x < currentBoard.width; ++x) {
-							for (int32 dir = 0; dir < 4; ++dir) {
-								Board newBoard = currentBoard.applyPatternCopy(pattern, Point(x, y), dir);
-								int32 newDiff = newBoard.calculateDifferenceByRow(targetRow, newBoard.grid);
-								if (newDiff < bestDiff) {
-									bestDiff = newDiff;
-									bestPattern = pattern;
-									bestPos = Point(x, y);
-									bestDirection = dir;
-									improved = true;
-									if (newDiff == 0) {
-										currentBoard.apply_pattern(bestPattern, bestPos, bestDirection);
-										solution.steps.push_back(std::make_tuple(bestPattern, bestPos, bestDirection));
-										solution.score += currentBoard.calculateDifference(currentBoard.goal);
-										return solution;
-									}
-								}
-							}
+		}
+		else {
+			for (int32 y1 : step(height)) {
+				for (int32 x1 : step(width)) {
+					for (int32 y2 : step(height)) {
+						for (int32 x2 : step(width)) {
+							int32 dx = x1 - x2;
+							int32 dy = y1 - y2;
+							int32 dist = std::popcount(static_cast<uint32>(Abs(dx))) + std::popcount(static_cast<uint32>(Abs(dy)));
+							if (dist == 0) continue;
+
+							// Point(y1, x1) -> int32
+							distances[y1 * width + x1][y2 * width + x2] = dist;
+							sortedDistances[y1][x1].push_back({ dist, Point(x2, y2) });
 						}
 					}
-				}
 
-				if (improved) {
-					currentBoard.apply_pattern(bestPattern, bestPos, bestDirection);
-					solution.steps.push_back(std::make_tuple(bestPattern, bestPos, bestDirection));
-					solution.score += currentBoard.calculateDifference(currentBoard.goal);
+					// static Grid<Array<std::pair<int32, Point>>> sortedDistances(width, height);
+					std::sort(sortedDistances[y1][x1].begin(), sortedDistances[y1][x1].end(), [&](const auto& a, const auto& b) {
+						return a.first < b.first;
+						});
 				}
-				else {
-					break;
+			}
+
+
+			initialized = true;
+		}
+
+		Array<std::pair<int32, Point>> cord;
+
+		for (int32 x : step(width)) {
+			for (int32 y : step(height)) {
+				if (board.grid[y][x] == board.goal[y][x]) continue;
+				for (const auto& candidate : sortedDistances[y][x]) {
+					int32 targetY = candidate.second.y, targetX = candidate.second.x;
+					if (board.grid[targetY][targetX] == board.goal[y][x] && board.grid[targetY][targetX] != board.goal[targetY][targetX]) {
+						// return p.second;
+						cord.push_back(candidate);
+					}
+
 				}
+				if (board.grid[y][x] != board.goal[y][x]) {
+					int32 maxStep = cord.size();
+					Console << U"max step:" << maxStep;
+					int32 bestDiff = 1e9;
+					Solution bestSolution;
+					for (int32 i : step(Min(5, maxStep))) {
+						Board newBoard = board;
+						const auto& points = cord[i].second;
+						int32 dy = points.y - y, dx = points.x - x;
+						Console << U"dx dy:" << Point(dx, dy);
+						Solution currentSolution;
+						if (dy == 0 && dx == 0) continue;
+						for (int32 bit = 0; bit <= 8; bit++) {
+							if ((abs(dy) >> bit) & 1) {
+								auto pattern = patterns[0];
+								if (bit == 0) {
+									pattern = patterns[0];
+								}
+								else {
+									// idx: 3*(bit-1)+1
+									pattern = patterns[3 * (bit - 1) + 1];
+								}
+
+								int32 dir = dy < 0; // dy > 0 => 上移動
+								newBoard.apply_pattern(pattern, Point(x + dx, y), dir);
+								currentSolution.steps.push_back(std::make_tuple(pattern, Point(x + dx, y), dir));
+							}
+						}
+						for (int32 bit = 0; bit <= 8; bit++) {
+							if ((dx >> bit) & 1) {
+								auto pattern = patterns[0];
+								if (bit == 0) {
+									pattern = patterns[0];
+								}
+								else {
+									pattern = patterns[3 * (bit - 1) + 1];
+								}
+								newBoard.apply_pattern(pattern, Point(x, y), 2);
+								currentSolution.steps.push_back(std::make_tuple(pattern, Point(x, y), 2));
+							}
+						}
+						int32 sumDiff = 0;
+
+						for (int32 ny = y; ny < height; ny++) {
+							if (newBoard.grid[ny][x] != newBoard.goal[ny][x]) sumDiff++;
+						}
+						Console << U"sumDiff : " << sumDiff;
+						if (sumDiff < bestDiff) {
+							bestSolution.steps = currentSolution.steps;
+							bestDiff = sumDiff;
+							Console << U"bestDiff:" << bestDiff;
+						}
+					}
+					const auto& [pat, point, d] = *bestSolution.steps.begin();
+					board.apply_pattern(pat, point, d);
+					solution.steps.push_back(*bestSolution.steps.begin());
+				}
+				return solution;
 			}
 		}
 
@@ -332,13 +576,35 @@ namespace Algorithm {
 				for (int32 dx = 1; x + dx < board.grid.width(); dx++) {
 					if (board.grid[y][x + dx] == initialBoard.goal[y][x]) {
 						found = true;
+						// bitが立っている部分
+						// 1->bit目 size:1 :: 1種類
+						// otherwise :: 3種類
+						// size : max 2^8
+						// max 距離 255
 
+						for (int32 bit = 0; bit <= 8; bit++) {
+							if ((dx >> bit) & 1) {
+								auto pattern = patterns[0];
+								if (bit == 0) {
+									pattern = patterns[0];
+								}
+								else {
+									// idx: 3*(bit-1)+1
+									pattern = patterns[3 * (bit - 1) + 1];
+								}
+								board.apply_pattern(pattern, Point(x, y), 2);
+								solution.steps.push_back(std::make_tuple(pattern, Point(x, y), 2));
+							}
+						}
+
+						/*
 						while (dx--) {
-							solution.steps.push_back(std::make_tuple(patterns[0], Point(x, y), 2));
+
 							// board = board.applyPatternCopy(patterns[0], Point(i, j), 2);
 							board.apply_pattern(patterns[0], Point(x, y), 2);
 
 						}
+						*/
 						found = 1;
 						break;
 					}
@@ -346,7 +612,7 @@ namespace Algorithm {
 
 				if (!found) {
 					//continue;
-					break;
+
 					for (int32 dy = 1; y + dy < board.grid.height(); dy++) {
 						bool foundAlternative = false;
 						for (int32 dx = 1; x + dx < board.grid.width(); dx++) {
@@ -436,11 +702,109 @@ namespace Algorithm {
 		return solution;
 	}
 
+	// 他のSolution 関数 とかと違い，1のみ先読みするsolutionの集合として考える
+	// solution_i と solution_{i+1}が連続でないみたいな
+	Solution nextState(const Board& initialBoad, const Array<Pattern>& patterns) {
+		Solution solution;
 
+		// 2手以内で到達可能な状態を探す
+		// 見つからなかったらdpのほうに投げる
+		static const int32 bitDy[] = { -128,-64,-32,-16,-8,-4,-2,-1, 0,1,2,4,8,16,32,64,128 };
+		static const int32 bitDx[] = { 0,1,2,4,8,16,32,64,128 };
+
+		for (int32 x : step(initialBoad.grid.width())) {
+			for (int32 y : step(initialBoad.grid.height())) {
+				if (initialBoad.grid[y][x] == initialBoad.goal[y][x]) continue;
+
+				for (const auto& dy : bitDy) {
+					for (const auto& dx : bitDx) {
+						if (dy <= 0 && dx == 0) continue;
+						int32 ny = y + dy, nx = x + dx;
+						if (ny < 0 || ny >= initialBoad.grid.height() || nx < 0 || nx >= initialBoad.grid.width()) continue;
+						if (initialBoad.grid[ny][nx] == initialBoad.goal[y][x]) {
+							for (int32 bit = 0; bit <= 8; bit++) {
+								if ((abs(dy) >> bit) & 1) {
+									auto pattern = patterns[0];
+									if (bit == 0) {
+										pattern = patterns[0];
+									}
+									else {
+										// idx: 3*(bit-1)+1
+										pattern = patterns[3 * (bit - 1) + 1];
+									}
+
+									int32 dir = dy < 0; // dy > 0 => 上移動
+									solution.steps.push_back(std::make_tuple(pattern, Point(x + dx, y), dir));
+								}
+							}
+							for (int32 bit = 0; bit <= 8; bit++) {
+								if ((dx >> bit) & 1) {
+									auto pattern = patterns[0];
+									if (bit == 0) {
+										pattern = patterns[0];
+									}
+									else {
+										pattern = patterns[3 * (bit - 1) + 1];
+
+									}
+									solution.steps.push_back(std::make_tuple(pattern, Point(x, y), 2));
+								}
+							}
+						}
+					}
+				}
+				return solution;
+			}
+		}
+		return solution;
+
+	}
+
+
+
+	/*
 	Solution simulatedAnnealing(const Board& initialBoard, const Array<Pattern>& patterns, int32 sy, int32 sx,
 	 int32 number, double startTemp, double endTemp) {
+	 */
+	Solution  simulatedAnnealing(const Board& initialBoard, const Array<Pattern>& patterns) {
 		Solution solution;
-		Console << U"sx, sy = {}"_fmt(Point(sx, sy));
+		Board board = initialBoard;
+		double startTemp = 50, endTemp = 10;
+		auto startTime = std::chrono::high_resolution_clock::now();
+		const double timeLimit = 120;
+		// 行動選択の乱数
+		std::mt19937 mtAction(0); // 初期化
+		const int32 INF = 1 << 31;
+		while (true) {
+			auto currentTime = std::chrono::high_resolution_clock::now();
+			double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+			if (elapsedTime > timeLimit) {
+				break;
+			}
+			Board newBoard = board;
+			Solution newSolutions = nextState(newBoard, patterns);
+			Console << U"new Sol size: " << newSolutions.steps.size();
+			if (newSolutions.steps.size() == 0) break;
+			int32 randomIndex = mtAction() % newSolutions.steps.size();
+			const auto& newSolution = newSolutions.steps[randomIndex];
+			const auto& [pattern, point, direction] = newSolution;
+			//newBoard.grid =
+			newBoard.apply_pattern(pattern, point, direction);
+			int32 newDiff = newBoard.calculateDifference(newBoard.grid);
+			int32 preDiff = board.calculateDifference(board.grid);
+			Console << U"newDiff, preDiff" << Point(newDiff, preDiff);
+			double temp = startTemp + (endTemp - startTemp) * (elapsedTime) / timeLimit;
+			double prob = exp((preDiff - newDiff) / temp);
+
+			if (prob > (mtAction() % INF) / (double)(INF) || 1 == 1) {
+				board = newBoard;
+				solution.steps.push_back(newSolution);
+
+			}
+
+
+		}
+		/*
 		int32 height = initialBoard.grid.height() - sy;
 		int32 width = initialBoard.grid.width() - sx;
 		Grid<int32> partialGrid = initialBoard.partialGrid(sy, sx);
@@ -494,7 +858,7 @@ namespace Algorithm {
 			}
 
 		}
-
+		*/
 		return solution;
 	}
 
@@ -510,7 +874,7 @@ namespace Algorithm {
 					pos.push(Point(x, y));
 					break;
 				}
-			
+
 			}
 		}
 
@@ -582,8 +946,8 @@ namespace Algorithm {
 				board.grid[y][i] = board.grid[y][j];
 				board.grid[y][j] = tmp;
 				// swap
-				
-				
+
+
 				for (int32 left : step(i)) {
 					solution.steps.push_back(std::make_tuple(patterns[0], Point(0, y), 2));
 				}
@@ -599,7 +963,7 @@ namespace Algorithm {
 				for (int32 right : step(i)) {
 					solution.steps.push_back(std::make_tuple(patterns[0], Point(i, y), 3));
 				}
-				
+
 				// Console << U"after:" << board.grid;
 				// return solution; // debug
 			}
@@ -607,6 +971,162 @@ namespace Algorithm {
 		solution.grid = board.grid;
 		return solution;
 	}
+
+	class ChokudaiSearch {
+	private:
+		const int32 initialBeamWidth;
+		const int32 maxBeamWidth;
+		const int32 initialMaxDepth;
+		const int32 absoluteMaxDepth;
+		const Array<Pattern>& patterns;
+
+		struct State {
+			Board board;
+			int32 score;
+			std::shared_ptr<std::vector<std::tuple<Pattern, Point, int32>>> steps;
+			State(const Board& b, int32 s)
+				: board(b), score(s), steps(std::make_shared<std::vector<std::tuple<Pattern, Point, int32>>>()) {}
+
+			State(const Board& b, int32 s, const std::shared_ptr<std::vector<std::tuple<Pattern, Point, int32>>>& prevSteps)
+				: board(b), score(s), steps(std::make_shared<std::vector<std::tuple<Pattern, Point, int32>>>(*prevSteps)) {}
+
+			bool operator<(const State& other) const {
+				return score > other.score;
+			}
+		};
+
+	public:
+		ChokudaiSearch(int32 initial_bw, int32 max_bw, int32 initial_md, int32 absolute_md, const Array<Pattern>& p)
+			: initialBeamWidth(initial_bw), maxBeamWidth(max_bw), initialMaxDepth(initial_md), absoluteMaxDepth(absolute_md), patterns(p) {}
+
+		std::vector<std::tuple<Pattern, Point, int32>> solve(const Board& initialBoard, int32 offset) {
+			std::vector<std::priority_queue<State>> beam(2);  // 現在の深さと次の深さだけを保持
+			std::unordered_set<size_t> visited;  // Boardの代わりにハッシュ値を保存
+			int32 currentBeamWidth = initialBeamWidth;
+			int32 currentMaxDepth = initialMaxDepth;
+
+			beam[0].push(State(initialBoard, initialBoard.calculateDifference(initialBoard.grid)));
+
+			for (int32 depth : step(absoluteMaxDepth)) {
+				int32 currentIndex = depth % 2;
+				int32 nextIndex = (depth + 1) % 2;
+				beam[nextIndex] = std::priority_queue<State>();  // 次の深さをクリア
+
+				int statesExpanded = 0;
+				int32 bestScore = std::numeric_limits<int32>::max();
+
+				while (!beam[currentIndex].empty() && beam[nextIndex].size() < currentBeamWidth) {
+					State current = beam[currentIndex].top();
+					beam[currentIndex].pop();
+
+					if (current.board.is_goal()) {
+						return *current.steps;
+					}
+
+					size_t boardHash = std::hash<Board>{}(current.board);
+					if (visited.find(boardHash) != visited.end()) {
+						continue;
+					}
+					visited.insert(boardHash);
+
+					statesExpanded++;
+					bestScore = std::min(bestScore, current.score);
+
+					for (const auto& pattern : patterns) {
+						// if (pattern.grid.height() >= initialBoard.grid.height()) continue;
+						if (pattern.grid.width() >= initialBoard.grid.width()) continue;
+						for (int32 y : step(current.board.grid.height())) {
+							for (int32 x : step(current.board.grid.width())) {
+								Array<int32> dirs = { 2 };
+								for (const auto& direction : dirs) {
+									Board newBoard = current.board.applyPatternCopy(pattern, Point(x, y), direction);
+									int32 newScore = newBoard.calculateDifference(newBoard.grid);
+									/*
+									State newState(newBoard, newScore);
+									newState.steps = current.steps;
+									// newState.steps = std::make_shared<std::vector<std::tuple<Pattern, Point, int32>>>(*current.stpes);
+									newState.steps->emplace_back(pattern, Point(x, y), direction);
+									*/
+									State newState(newBoard, newScore, current.steps);
+									newState.steps->emplace_back(pattern, Point(x, y + offset), direction);
+									if (beam[nextIndex].size() < currentBeamWidth || newScore < beam[nextIndex].top().score) {
+										beam[nextIndex].push(std::move(newState));
+										if (beam[nextIndex].size() > currentBeamWidth) {
+											beam[nextIndex].pop();
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+
+				if (beam[nextIndex].empty()) {
+					break;  // 次の深さに進める状態がない場合は探索を終了
+				}
+
+				// ビーム幅の動的調整
+				if (statesExpanded < currentBeamWidth / 2) {
+					currentBeamWidth = std::max(initialBeamWidth, currentBeamWidth / 2);
+				}
+				else if (statesExpanded == currentBeamWidth && currentBeamWidth < maxBeamWidth) {
+					currentBeamWidth = std::min(maxBeamWidth, currentBeamWidth * 2);
+				}
+
+				// 深さの動的調整
+				if (depth >= currentMaxDepth - 1) {
+					Console << beam[0].empty();
+					if (bestScore > beam[0].top().score) {
+						// スコアが改善していない場合、探索を終了
+						break;
+					}
+					else {
+						// スコアが改善している場合、深さを増やす
+						currentMaxDepth = std::min(absoluteMaxDepth, currentMaxDepth + initialMaxDepth);
+					}
+				}
+			}
+
+			// 最良の解を返す
+			if (!beam[0].empty()) {
+				return *beam[0].top().steps;
+			}
+
+			// 解が見つからなかった場合
+			return {};
+		}
+
+	};
+
+	Solution chokudaiSearch(const Board& board, const Array<Pattern>& patterns) {
+		Solution solution;
+		Board initialBoard = board;
+		int32 cellCount = board.grid.height() * board.grid.width();
+		/*
+		ChokudaiSearch cs(cellCount * 4, cellCount * 40, cellCount, cellCount * log2(cellCount), patterns);
+		solution.steps = cs.solve(initialBoard);
+		*/
+
+		// 行ごとに行う
+		for (int32 y : step(board.grid.height())) {
+			Board partialBoard = Board(board.grid.width(), 1);
+			for (int32 x : step(board.grid.width())) {
+				partialBoard.grid[0][x] = board.grid[y][x];
+				partialBoard.goal[0][x] = board.goal[y][x];
+			}
+			cellCount = board.grid.width();
+			Solution partialSolution;
+			ChokudaiSearch cs(cellCount * cellCount, cellCount * cellCount * cellCount, cellCount, cellCount * log2(cellCount), patterns);
+			partialSolution.steps = cs.solve(partialBoard, y);
+			return partialSolution;
+			for (auto x : partialSolution.steps) {
+				solution.steps.push_back(x);
+			}
+
+		}
+		return solution;
+	}
+
 
 	Solution solve(Type algorithmType, const Board& initialBoard, const Array<Pattern>& patterns) {
 		Point p = Cursor::Pos();
@@ -630,12 +1150,17 @@ namespace Algorithm {
 		case Type::DiagonalSearch:
 			return diagonalSearch(initialBoard, patterns);
 		case Type::SimulatedAnnealing:
+			return simulatedAnnealing(initialBoard, patterns);
+			/*
 			if (sy < 0 || sy >= initialBoard.grid.height() || sx < 0 || sx >= initialBoard.grid.width()) return Solution();
 			return simulatedAnnealing(initialBoard, patterns, p.y / 7, p.x / 7); // セルのサイズで割る
+			*/
 		case Type::Dijkstra:
 			return dijkstra(initialBoard, patterns);
 		case Type::HorizontalSwapSort:
 			return horizontalSwapSort(initialBoard, patterns);
+		case Type::ChokudaiSearch:
+			return chokudaiSearch(initialBoard, patterns);
 		default:
 			throw Error(U"Unknown algorithm type");
 		}

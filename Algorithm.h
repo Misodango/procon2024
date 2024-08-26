@@ -19,13 +19,14 @@ namespace Algorithm {
 		SimulatedAnnealing,
 		Dijkstra,
 		HorizontalSwapSort,
+		ChokudaiSearch
 	};
 
 	struct Solution {
 		// 抜き型 座標 方向
 		Array<std::tuple<Pattern, Point, int32>> steps;
-		int32 score;
-		Grid<int32> grid;
+		int32 score = 0;
+		Grid<int32> grid = Grid<int32>();
 	};
 
 	Solution timeLimitedGreedy(const Board& initialBoard, const Array<Pattern>& patterns, int32 time = -1);
@@ -35,13 +36,16 @@ namespace Algorithm {
 	Solution rowByRowAdvancedGreedy(const Board& initialBoard, const Array<Pattern>& patterns);
 	Solution oneByOne(const Board& initialBoard, const Array<Pattern>& patterns);
 	Solution diagonalSearch(const Board& initialBoard, const Array<Pattern>& patterns);
+	/*
 	Solution simulatedAnnealing(const Board& initialBoard, const Array<Pattern>& patterns, int32 sy = 0, int32 sx = 0,
 	 int32 number = 100, double startTemp = 500, double endTemp = 100);
+	 */
+	Solution  simulatedAnnealing(const Board& initialBoard, const Array<Pattern>& patterns);
 	Solution dijkstra(const Board& initialBoard, const Array<Pattern>& patterns);
 	Solution horizontalSwapSort(const Board& initialBoard, const Array<Pattern>& patterns);
 	std::vector<std::pair<int32, int32>> sortToMatchPartially(Array<int32>& A, const Array<int32>& B);
 	Solution swap(const Board& initialBoard, const Array<Pattern>& patterns, int32 i, int32 j, int32 y);
-
+	Solution chokudaiSearch(const Board& intitialBoard, const Array<Pattern>& patterns);
 
 	Solution solve(Type algorithmType, const Board& initialBoard, const Array<Pattern>& patterns);
 

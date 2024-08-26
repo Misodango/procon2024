@@ -37,11 +37,37 @@ std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 	return { board, patterns };
 }
 
+
+// 学習用のデータ生成
+void generateData(int32 width, int32 height, int32 moveCount) {
+
+	Board board(width, height);
+
+	int32 totalCells = width * height;
+	int32 minCount = Min(1, totalCells / 10);
+	Array<int32> counts(4, minCount);
+	int32 remain = totalCells - minCount * 4;
+	for (auto i : step(remain)) {
+		counts[Random(0, 3)]++;
+	}
+	Array<int32> numbers;
+	for (auto i : step(4)) {
+		for (auto j : step(counts[i])) {
+			numbers.push_back(i);
+		}
+	}
+	std::mt19937 get_rand_mt;
+	std::shuffle(numbers.begin(), numbers.end(), get_rand_mt);
+
+
+}
+
+
 void Main() {
 	// Window::Resize(1920, 1080);
 	const auto monitor = System::EnumerateMonitors()[0];
-	
-	Window::Resize(monitor.fullscreenResolution); 
+
+	Window::Resize(monitor.fullscreenResolution);
 	FontAsset::Register(U"Cell", 20);
 	FontAsset::Register(U"Button", 30, Typeface::Bold);
 	Scene::SetBackground(ColorF{ 0.8, 1.0, 0.9 });
@@ -58,7 +84,8 @@ void Main() {
 	int32 patternWidth = patterns[currentPattern].grid.width();
 
 	Array<Algorithm::Type> algorithms = { Algorithm::Type::Greedy, Algorithm::Type::BeamSearch, Algorithm::Type::DynamicProgramming, Algorithm::Type::RowByGreedy,  Algorithm::Type::RowByRowAdvancedGreedy,
-	Algorithm::Type::OneByOne, Algorithm::Type::DiagonalSearch, Algorithm::Type::SimulatedAnnealing, Algorithm::Type::Dijkstra, Algorithm::Type::HorizontalSwapSort };
+	Algorithm::Type::OneByOne, Algorithm::Type::DiagonalSearch, Algorithm::Type::SimulatedAnnealing, Algorithm::Type::Dijkstra, Algorithm::Type::HorizontalSwapSort,
+		Algorithm::Type::ChokudaiSearch };
 	GameMode currentMode = GameMode::Manual;
 	int32 currentAlgorithm = 0;
 	Rect manualButton(1000, 650, 200, 50);
@@ -67,7 +94,7 @@ void Main() {
 	Rect resetButton(1600, 650, 200, 50);
 	// リセット誤爆防止 10回押したらリセットされる
 	int32 resetFailProof = 0;
-	Array<String> algorithmNames = { U"Greedy", U"BeamSearch", U"DP", U"RowGreedy", U"RowGreedy改", U"OneByOne", U"Diagonal", U"Annealing", U"dijkstra" , U"水平スワップソート0" };
+	Array<String> algorithmNames = { U"Greedy", U"BeamSearch", U"DP", U"RowGreedy", U"RowGreedy改", U"OneByOne", U"Diagonal", U"Annealing", U"dijkstra" , U"水平スワップソート", U"chokudai" };
 
 	double progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
 
@@ -75,7 +102,7 @@ void Main() {
 
 	while (System::Update()) {
 
-		
+
 
 
 		if (manualButton.leftClicked()) {
@@ -93,15 +120,70 @@ void Main() {
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
 			}
 		}
+		if (KeyO.down()) {
+			if (board.is_goal()) {
+				JSON output;
+				output[U"n"] = static_cast<int32>(answer.steps.size());
+				Array<JSON> ops;
+
+				for (const auto& [solvePattern, solvePos, solveDir] : answer.steps)
+				{
+					JSON stepJson;
+					stepJson[U"p"] = solvePattern.p;
+					stepJson[U"x"] = solvePos.x;
+					stepJson[U"y"] = solvePos.y;
+					stepJson[U"s"] = solveDir;
+					ops << stepJson;
+				}
+
+				output[U"ops"] = ops;
+				Console << U"Writing ...";
+				output.save(U"output.json");
+				Console << U"Wrote ";
+				JSON submission;
+				try {
+					submission = JSON::Load(U"output.json");
+					const FilePath path = FileSystem::FullPath(U"output.json");
+					Console << U"Full path: " << path;
+					JSON submission = JSON::Load(path);
+					if (not submission) {
+						throw Error(U"Failed to load JSON file");
+					}
+					Console << U"Loaded JSON: " << submission;
+				}
+				catch (const Error& error) {
+					Console << U"Error loading JSON: " << error.what();
+				}
+
+				// POST
+
+			}
+		}
 		if (autoButton.leftClicked() || KeyEnter.down()) {
 			if (board.is_goal()) {
 				board = initializeFromJSON(U"input.json").first;
+				std::unordered_map<Board, int32> seen;
+
+				int cnt = 0;
+				int sum = 0;
 				for (const auto& [solvePattern, solvePos, solveDir] : answer.steps) {
-					
+
 					board.apply_pattern(solvePattern, solvePos, solveDir);
+
+
+					if (seen.count(board)) {
+						seen[board]++;
+						Console << U"seen " << cnt;
+						Console << board.grid << U" " << seen[board];
+						sum++;
+						Console << U"pos:{}, dir:{}"_fmt(solvePos, solveDir);
+					}
+					else seen[board]++;
 					board.draw();
 					System::Update();
+					cnt++;
 				}
+				Console << sum;
 			}
 			int32 diff = board.calculateDifference(board.grid);
 			int32 height = board.grid.height(), width = board.grid.width();
@@ -110,7 +192,7 @@ void Main() {
 				Algorithm::Solution solution;
 				if (KeySpace.down()) { break; }
 				for (int32 i : step(2)) {
-					Algorithm::Type algo = i % 2 ? Algorithm::Type::HorizontalSwapSort : Algorithm::Type::Dijkstra;
+					Algorithm::Type algo = i % 2 ? Algorithm::Type::OneByOne : Algorithm::Type::Dijkstra;
 					solution = Algorithm::solve(algo, board, patterns);
 					for (int32 h : step(height)) {
 						for (int32 w : step(width)) {
@@ -122,10 +204,10 @@ void Main() {
 					}
 				}
 				// 変化がない時
-				if (diff = board.calculateDifference(board.grid)) {
+				if (diff == board.calculateDifference(board.grid)) {
 					int32 lastDiff = -1;
 					while (lastDiff != diff) {
-						solution = Algorithm::solve(Algorithm::Type::OneByOne, board, patterns);
+						solution = Algorithm::solve(Algorithm::Type::HorizontalSwapSort, board, patterns);
 						for (int32 h : step(height)) {
 							for (int32 w : step(width)) {
 								board.grid[h][w] = solution.grid[h][w];
@@ -151,7 +233,7 @@ void Main() {
 			Console << elapsedTime << U"sec";
 		}
 		if (currentMode == GameMode::Manual) {
-			patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
+			if (Cursor::Delta().x > 0 || Cursor::Delta().y > 0) patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
 			// 入力処理
 			if (KeyLeft.down()) patternPos.x = Max(-patternWidth + 1, patternPos.x - 1);
 			if (KeyRight.down()) patternPos.x = Min(board.width - 1, patternPos.x + 1);
@@ -159,7 +241,6 @@ void Main() {
 			if (KeyDown.down()) patternPos.y = Min(board.height - 1, patternPos.y + 1);
 			if (KeyTab.down()) {
 				currentPattern = (currentPattern + 1) % patterns.size();
-
 				patternHeight = patterns[currentPattern].grid.height();
 				patternWidth = patterns[currentPattern].grid.width();
 				patternPos = Point(0, 0);
@@ -176,7 +257,7 @@ void Main() {
 				auto solution = Algorithm::solve(algorithms[currentAlgorithm], board, patterns);
 				Console << U"step size:" << solution.steps.size();
 				int32 height = board.grid.height(), width = board.grid.width();
-				if (solution.grid.height() == height && solution.grid.width() == width) {
+				if (solution.grid.height() == height && solution.grid.width() == width && 1 == 0) {
 					for (int32 h : step(height)) {
 						for (int32 w : step(width)) {
 							board.grid[h][w] = solution.grid[h][w];
@@ -186,11 +267,45 @@ void Main() {
 				else {
 					for (const auto& [solvePattern, solvePos, solveDir] : solution.steps) {
 						board.apply_pattern(solvePattern, solvePos, solveDir);
-
+						board.draw();
+						System::Update();
 					}
 				}
 
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
+			}
+			if (KeyD.down()) {
+				answer = Algorithm::Solution();
+				int32 diff = board.calculateDifference(board.grid);
+				int32 height = board.grid.height(), width = board.grid.width();
+				auto startTime = std::chrono::high_resolution_clock::now();
+				while (diff) {
+					Algorithm::Solution solution;
+					if (KeySpace.down()) { break; }
+
+					Algorithm::Type algo = Algorithm::Type::DynamicProgramming;
+					solution = Algorithm::solve(algo, board, patterns);
+					Console << U"size :" << solution.steps.size();
+					for (int32 h : step(height)) {
+						for (int32 w : step(width)) {
+							board.grid[h][w] = solution.grid[h][w];
+						}
+					}
+					for (auto x : solution.steps) {
+						answer.steps.push_back(x);
+					}
+
+					diff = board.calculateDifference(board.grid);
+					progress = 100.0 * (1.0 - double(diff) / double((board.grid.height() * board.grid.width())));
+					// board.draw();
+					// System::Update();
+
+
+				}
+				auto currentTime = std::chrono::high_resolution_clock::now();
+				double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+				Console << elapsedTime << U"sec";
+				Console << answer.steps.size() << U"terns";
 			}
 
 		}
@@ -232,6 +347,6 @@ void Main() {
 			FontAsset(U"Cell")(U"Goal Reached!").drawAt(Scene::Center(), Palette::Red);
 		}
 
-		
+
 	}
 }

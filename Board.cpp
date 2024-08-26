@@ -5,6 +5,7 @@
 
 Board::Board(int32 w, int32 h) : width(w), height(h), grid(w, h, 0), goal(w, h, 0) {}
 
+
 Board Board::fromJSON(const JSON& json) {
 	Console << json;
 	const int32 width = json[U"width"].get<int32>();
@@ -40,9 +41,6 @@ bool Board::is_goal() const {
 
 // ゴール状態との差異を計算
 int32 Board::calculateDifference(const Grid<int32>& otherGrid) const {
-	Console << otherGrid;
-	Console << goal;
-	Console << height << U" " << width;
 	int32 diff = 0;
 	for (int32 y = 0; y < height; ++y) {
 		for (int32 x = 0; x < width; ++x) {
@@ -226,8 +224,13 @@ size_t Board::hash() const {
 	return seed;
 }
 
+
 bool Board::operator==(const Board& other) const {
 	return grid == other.grid;
+}
+
+bool Board::operator!=(const Board& other) const {
+	return !(*this == other);
 }
 
 int32 Board::calculateDifferenceByRow(int32 row, const Grid<int32>& otherGrid) const {
@@ -338,13 +341,85 @@ Point Board::BFS(Point start, int32 target) const {
 				if (minDist > dist[ny][nx]) {
 					minDist = dist[ny][nx];
 					pos = Point(nx, ny);
-			}
 				}
+			}
 
 		}
 	}
 	// Console << U"dist: " << dist;
 	return pos;
+}
+
+Point Board::BFSbyPopcount(Point start, int32 target) const {
+	int32 sy = start.y, sx = start.x;
+	Point best = Point(-1, -1);
+
+	static Grid<int32> distances(width * height, width * height);
+	static Grid<Array<std::pair<int32, Point>>> sortedDistances(width, height); // (y, x) に近いものを順に入れたい
+
+	static bool initialized;
+
+	if (initialized) {
+		Console << U"calculated";
+
+	}
+	else {
+		for (int32 y1 : step(height)) {
+			for (int32 x1 : step(width)) {
+				for (int32 y2 : step(height)) {
+					for (int32 x2 : step(width)) {
+						int32 dx = x1 - x2;
+						int32 dy = y1 - y2;
+						int32 dist = std::popcount(static_cast<uint32>(Abs(dx))) + std::popcount(static_cast<uint32>(Abs(dy)));
+						// int32 dist = std::popcount(static_cast<uint32>(Abs(dx))) + (dy > 0); // yに関して，1手で変更可能
+						if (dist == 0) continue;
+						if (abs(dx) + abs(dy) == 1) dist += 2; // 大きいものを使いたい
+						// Point(y1, x1) -> int32
+						distances[y1 * width + x1][y2 * width + x2] = dist;
+						sortedDistances[y1][x1].push_back({ dist, Point(x2, y2) });
+					}
+				}
+
+				// static Grid<Array<std::pair<int32, Point>>> sortedDistances(width, height);
+				std::sort(sortedDistances[y1][x1].begin(), sortedDistances[y1][x1].end(), [&](const auto& a, const auto& b) {
+
+					return a.first < b.first;
+					});
+
+
+			}
+		}
+
+
+		initialized = true;
+	}
+
+	for (const auto& p : sortedDistances[sy][sx]) {
+		const auto& x = p.second.x, & y = p.second.y;
+		if (grid[y][x] == target && grid[y][x] != goal[y][x]) {
+			// return p.second;
+			best = Point(x, y);
+			break;
+		}
+	}
+
+
+
+	/* 愚直
+	for (int32 y : step(height)) {
+		for (int32 x : step(width)) {
+			if (grid[y][x] == target && grid[y][x] != goal[y][x]) {
+				uint32 dy = AbsDiff(y, sy), dx = AbsDiff(x, sx);
+				int32 pcount = std::popcount(dx) + std::popcount(dy);
+				if (dist > pcount) {
+					best = Point(x, y);
+					dist = pcount;
+				}
+			}
+		}
+	}
+	*/
+	return best;
 }
 
 std::vector<std::pair<int32, int32>> Board::sortToMatchPartially(int32 targetRow)const {
@@ -399,3 +474,4 @@ std::vector<std::pair<int32, int32>> Board::sortToMatchPartially(int32 targetRow
 
 	return swaps;
 }
+
