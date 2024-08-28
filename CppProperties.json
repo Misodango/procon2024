@@ -1,0 +1,23 @@
+{
+  "configurations": [
+    {
+      "inheritEnvironments": [
+        "msvc_x64"
+      ],
+      "name": "x64-Debug",
+      "includePath": [
+        "${workspaceRoot}\\..\\..\\..\\..\\Documents\\OpenSiv3D_0.6.15\\include\\ThirdParty",
+        "${workspaceRoot}\\..\\..\\..\\..\\Documents\\OpenSiv3D_0.6.15\\include",
+        "${env.INCLUDE}",
+        "${workspaceRoot}\\**"
+      ],
+      "defines": [
+        "WIN32",
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE"
+      ],
+      "intelliSenseMode": "windows-msvc-x64"
+    }
+  ]
+}

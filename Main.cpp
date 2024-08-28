@@ -1,4 +1,4 @@
-﻿# include <Siv3D.hpp>
+﻿#include <Siv3D.hpp>
 
 #include "Pattern.h"
 #include "StandardPatterns.h"
@@ -76,7 +76,7 @@ void Main() {
 
 	// JSONファイルからゲームを初期化
 	auto [board, patterns] = initializeFromJSON(U"input.json");
-	int32 cellSize = Min(1920 / board.grid.width(), 1080 / board.grid.height());
+	int32 cellSize = Min(1024 / board.grid.width(), 1024 / board.grid.height());
 	int32 currentPattern = 0;
 	Point patternPos(0, 0);
 	int32 direction = 0;
@@ -286,12 +286,17 @@ void Main() {
 					Algorithm::Type algo = Algorithm::Type::DynamicProgramming;
 					solution = Algorithm::solve(algo, board, patterns);
 					Console << U"size :" << solution.steps.size();
+
 					for (int32 h : step(height)) {
 						for (int32 w : step(width)) {
 							board.grid[h][w] = solution.grid[h][w];
 						}
+
 					}
-					for (auto x : solution.steps) {
+
+					for (const auto& x : solution.steps) {
+						/*const auto& [pattern, point, direction] = x;
+						board.apply_pattern(pattern, point, direction);*/
 						answer.steps.push_back(x);
 					}
 
