@@ -304,7 +304,7 @@ void Main() {
 			Console << elapsedTime << U"sec";
 		}
 		if (currentMode == GameMode::Manual) {
-			if (Cursor::Delta().x > 0 || Cursor::Delta().y > 0) patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
+			if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0) patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
 			// 入力処理
 			if (KeyLeft.down()) patternPos.x = Max(-patternWidth + 1, patternPos.x - 1);
 			if (KeyRight.down()) patternPos.x = Min(board.width - 1, patternPos.x + 1);
