@@ -90,6 +90,7 @@ Board Board::applyPatternCopy(const Pattern& pattern, Point pos, int32 direction
 }
 
 void Board::draw() const {
+	if (grid.height() > 200 || grid.width() > 200) { return; }
 	const auto monitor = System::EnumerateMonitors()[0];
 	const int32 cellSize = Min(1024 / grid.width(), 1024 / grid.height());
 	const ColorF gridColor(0.5, 0.5, 0.5);  // グリッドの色（灰色）

@@ -913,182 +913,105 @@ namespace Algorithm {
 		return solution;
 	}
 
-	class ChokudaiSearch {
-	private:
-		const int32 initialBeamWidth;
-		const int32 maxBeamWidth;
-		const int32 initialMaxDepth;
-		const int32 absoluteMaxDepth;
-		const Array<Pattern>& patterns;
-
+	Solution chokudaiSearch(const Board& board, const Array<Pattern>& patterns) {
+		static const int32 height = board.grid.height();
+		static const int32 width = board.grid.width();
+		static const int32 beamWidth = 1000;
+		static const int32 beamDepth = height * width;
+		static const int32 beamNumber = 1;
 		struct State {
+
 			Board board;
+			Solution solution;
 			int32 score;
-			std::shared_ptr<std::vector<std::tuple<Pattern, Point, int32>>> steps;
-			State(const Board& b, int32 s)
-				: board(b), score(s), steps(std::make_shared<std::vector<std::tuple<Pattern, Point, int32>>>()) {}
-
-			State(const Board& b, int32 s, const std::shared_ptr<std::vector<std::tuple<Pattern, Point, int32>>>& prevSteps)
-				: board(b), score(s), steps(std::make_shared<std::vector<std::tuple<Pattern, Point, int32>>>(*prevSteps)) {}
-
-			bool operator<(const State& other) const {
-				return score > other.score;
-			}
+			State(const Board& b, const Solution& s, int32 sc) :board(b), solution(s), score(sc) {}
 		};
 
-	public:
-		ChokudaiSearch(int32 initial_bw, int32 max_bw, int32 initial_md, int32 absolute_md, const Array<Pattern>& p)
-			: initialBeamWidth(initial_bw), maxBeamWidth(max_bw), initialMaxDepth(initial_md), absoluteMaxDepth(absolute_md), patterns(p) {}
-
-		std::vector<std::tuple<Pattern, Point, int32>> solve(const Board& initialBoard, int32 offset) {
-			std::vector<std::priority_queue<State>> beam(2);  // 現在の深さと次の深さだけを保持
-			std::unordered_set<size_t> visited;  // Boardの代わりにハッシュ値を保存
-			int32 currentBeamWidth = initialBeamWidth;
-			int32 currentMaxDepth = initialMaxDepth;
-
-			beam[0].push(State(initialBoard, initialBoard.calculateDifference(initialBoard.grid)));
-
-			for (int32 depth : step(absoluteMaxDepth)) {
-				int32 currentIndex = depth % 2;
-				int32 nextIndex = (depth + 1) % 2;
-				beam[nextIndex] = std::priority_queue<State>();  // 次の深さをクリア
-
-				int statesExpanded = 0;
-				int32 bestScore = std::numeric_limits<int32>::max();
-
-				while (!beam[currentIndex].empty() && beam[nextIndex].size() < currentBeamWidth) {
-					State current = beam[currentIndex].top();
-					beam[currentIndex].pop();
-
-					if (current.board.is_goal()) {
-						return *current.steps;
-					}
-
-					size_t boardHash = std::hash<Board>{}(current.board);
-					if (visited.find(boardHash) != visited.end()) {
-						continue;
-					}
-					visited.insert(boardHash);
-
-					statesExpanded++;
-					bestScore = std::min(bestScore, current.score);
-					/* nextStateの戻り値の型をArray<Solution>にするのでここも変更 */
-					//Solution newSolutions = nextState(current.board, patterns);
-					//if (newSolutions.steps.size() == 0) {
-					//	newSolutions = dynamicProgramming(current.board, patterns, 0);
-					//}
-					//for (const auto& newSolution : newSolutions.steps) {
-					//	const auto& [pattern, point, direction] = newSolution;
-					//	Board newBoard = current.board.applyPatternCopy(pattern, point, direction);
-					//	int32 newScore = newBoard.calculateDifference(newBoard.grid);
-
-					//	State newState(newBoard, newScore, current.steps);
-					//	newState.steps->emplace_back(pattern, point, direction);
-
-					//	if (beam[nextIndex].size() < currentBeamWidth || newScore < beam[nextIndex].top().score) {
-					//		beam[nextIndex].push(std::move(newState));
-					//		if (beam[nextIndex].size() > currentBeamWidth) {
-					//			beam[nextIndex].pop();
-					//		}
-					//	}
-					//}
-
-					///*
-					//for (const auto& pattern : patterns) {
-					//	// if (pattern.grid.height() >= initialBoard.grid.height()) continue;
-					//	if (pattern.grid.width() >= initialBoard.grid.width()) continue;
-					//	for (int32 y : step(current.board.grid.height())) {
-					//		for (int32 x : step(current.board.grid.width())) {
-					//			Array<int32> dirs = { 2 };
-					//			for (const auto& direction : dirs) {
-					//				Board newBoard = current.board.applyPatternCopy(pattern, Point(x, y), direction);
-					//				int32 newScore = newBoard.calculateDifference(newBoard.grid);
-
-					//				// State newState(newBoard, newScore);
-					//				// newState.steps = current.steps;
-					//				// newState.steps = std::make_shared<std::vector<std::tuple<Pattern, Point, int32>>>(*current.stpes);
-					//				// newState.steps->emplace_back(pattern, Point(x, y), direction);
-
-					//				State newState(newBoard, newScore, current.steps);
-					//				newState.steps->emplace_back(pattern, Point(x, y + offset), direction);
-					//				if (beam[nextIndex].size() < currentBeamWidth || newScore < beam[nextIndex].top().score) {
-					//					beam[nextIndex].push(std::move(newState));
-					//					if (beam[nextIndex].size() > currentBeamWidth) {
-					//						beam[nextIndex].pop();
-					//					}
-					//				}
-					//			}
-					//		}
-					//	}
-					//}
-					//*/
+		auto progress = [](const Board& a) {
+			// そのうち二分探索にしたい
+			int32 res = 0;
+			for (int32 x : step(a.width)) {
+				for (int32 y : step(a.height)) {
+					if (a.grid[y][x] != a.goal[y][x]) return res;
+					res++;
 				}
+			}
+			return res;
+			};
+		auto compareStates = [](const State& a, const State& b) {
+			return a.score < b.score; // スコアが高い方が優先
+			// return a.score > b.score; // スコアが低い方が優先
+			};
 
-				if (beam[nextIndex].empty()) {
-					break;  // 次の深さに進める状態がない場合は探索を終了
-				}
 
-				// ビーム幅の動的調整
-				if (statesExpanded < currentBeamWidth / 2) {
-					currentBeamWidth = std::max(initialBeamWidth, currentBeamWidth / 2);
-				}
-				else if (statesExpanded == currentBeamWidth && currentBeamWidth < maxBeamWidth) {
-					currentBeamWidth = std::min(maxBeamWidth, currentBeamWidth * 2);
-				}
 
-				// 深さの動的調整
-				if (depth >= currentMaxDepth - 1) {
-					Console << beam[0].empty();
-					if (bestScore > beam[0].top().score) {
-						// スコアが改善していない場合、探索を終了
+		Solution solution;
+		State state(board, solution, progress(board));
+
+		std::vector<std::priority_queue<State, std::vector<State>, decltype(compareStates)>> beam(beamDepth + 1);
+		for (int32 depth : step(beamDepth + 1)) {
+			beam[depth] = std::priority_queue<State, std::vector<State>, decltype(compareStates)>(compareStates);
+		}
+		// beam[0].push(state);
+		beam[0].emplace(board, Solution(), board.calculateDifference(board.goal));
+		for (int32 cnt : step(beamNumber)) {
+			for (int32 depth : step(beamDepth)) {
+				auto& currentBeam = beam[depth];
+				auto& nextBeam = beam[depth + 1];
+				for (int32 wid : step(beamWidth)) {
+					if (currentBeam.empty()) {
 						break;
 					}
-					else {
-						// スコアが改善している場合、深さを増やす
-						currentMaxDepth = std::min(absoluteMaxDepth, currentMaxDepth + initialMaxDepth);
+
+					State currentState = currentBeam.top();
+					if (currentState.board.is_goal()) {
+						break;
+					}
+
+					currentBeam.pop();
+
+					const auto& legalActions = nextState(currentState.board, patterns);
+					for (const auto& solutions : legalActions) {
+						Board nextBoard = currentState.board;
+						int32 stepSize = solutions.steps.size();
+						Solution nextSolution;
+						for (const auto& action : solutions.steps) {
+							const auto& [pattern, point, direction] = action;
+							Console << U"ponit{}, dir{}"_fmt(point, direction);
+							nextBoard.apply_pattern(pattern, point, direction);
+							nextSolution.steps.push_back(action);
+							currentState.solution.steps.push_back(action);
+						}
+						double delta = progress(nextBoard) - progress(currentState.board);
+						double acc = 1 - double(nextBoard.calculateDifference(nextBoard.grid) / (height * width));
+						double newScore = delta / stepSize * acc;
+
+						Console << U"score:" << newScore;
+						Console << U"new Prog, before ,Prog:" << Point(progress(nextBoard), progress(currentState.board));
+						State newState = State(nextBoard, currentState.solution, newScore);
+
+						if (depth == 0) {
+							newState.solution = nextSolution;
+						}
+						for (int32 _ : step(stepSize)) currentState.solution.steps.pop_back();
+						nextBeam.emplace(newState);
+
+
+						// }
 					}
 				}
 			}
-
-			// 最良の解を返す
-			if (!beam[0].empty()) {
-				return *beam[0].top().steps;
-			}
-
-			// 解が見つからなかった場合
-			return {};
 		}
 
-	};
+		for (int32 depth : step(beamDepth, 0, -1)) {
+			const auto& currentBeam = beam[depth];
 
-	Solution chokudaiSearch(const Board& board, const Array<Pattern>& patterns) {
-		Solution solution;
-		Board initialBoard = board;
-		int32 cellCount = board.grid.height() * board.grid.width();
+			if (!currentBeam.empty()) {
+				return currentBeam.top().solution;
+			}
+		}
 
-		// ChokudaiSearch cs(cellCount * 4, cellCount * 40, cellCount, cellCount * log2(cellCount), patterns);
-		ChokudaiSearch cs(board.grid.height(), board.grid.height(), cellCount, cellCount * 2, patterns);
-		solution.steps = cs.solve(initialBoard, 0);
-
-
-		//// 行ごとに行う
-		//for (int32 y : step(board.grid.height())) {
-		//	Board partialBoard = Board(board.grid.width(), 1);
-		//	for (int32 x : step(board.grid.width())) {
-		//		partialBoard.grid[0][x] = board.grid[y][x];
-		//		partialBoard.goal[0][x] = board.goal[y][x];
-		//	}
-		//	cellCount = board.grid.width();
-		//	Solution partialSolution;
-		//	ChokudaiSearch cs(cellCount * cellCount, cellCount * cellCount * cellCount, cellCount, cellCount * log2(cellCount), patterns);
-		//	partialSolution.steps = cs.solve(partialBoard, y);
-		//	return partialSolution;
-		//	for (auto x : partialSolution.steps) {
-		//		solution.steps.push_back(x);
-		//	}
-
-		//}
-		return solution;
+		return dynamicProgramming(board, patterns, 0);
 	}
 
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns, int32 beamWidth, int32 maxSteps) {

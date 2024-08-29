@@ -185,9 +185,10 @@ void Main() {
 			resetFailProof++;
 			if (resetFailProof == 10) {
 				resetFailProof = 0;
-				// board = initializeFromJSON(U"input.json").first;
-				board = initializeFromGet(getUrl, token, U"_input.json").first;
+				board = initializeFromJSON(U"input.json").first;
+				// board = initializeFromGet(getUrl, token, U"_input.json").first;
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
+				cellSize = Min(1024 / board.grid.width(), 1024 / board.grid.height());
 			}
 		}
 		if (KeyO.down()) {
