@@ -271,7 +271,7 @@ void Main() {
 						System::Update();
 					}
 				}
-
+				solution.outuputToJson();
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
 			}
 			if (KeyD.down()) {
