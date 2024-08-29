@@ -11,11 +11,11 @@
 std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 	JSON json;
 	Board board(1, 1);  // デフォルトの空のボードを作成
-	Array<Pattern> patterns = StandardPatterns::getAllStandardPatterns_Grid();
+	static Array<Pattern> patterns = StandardPatterns::getAllStandardPatterns_Grid();
 
 	try {
 		json = JSON::Load(path);
-		const FilePath path = FileSystem::FullPath(U"input.json");
+		// const FilePath path = FileSystem::FullPath(U"input.json");
 		Console << U"Full path: " << path;
 		JSON json = JSON::Load(path);
 		if (not json) {
@@ -37,6 +37,64 @@ std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 	return { board, patterns };
 }
 
+std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String token, const FilePath& path) {
+	JSON json;
+	Board board(1, 1);  // デフォルトの空のボードを作成
+	static Array<Pattern> patterns = StandardPatterns::getAllStandardPatterns_Grid();
+	const HashTable<String, String> header = { { U"Procon-Token",token} };
+	if (const auto response = SimpleHTTP::Get(url, header, path))
+	{
+		Console << U"------";
+		Console << response.getStatusLine().rtrimmed();
+		Console << U"status code: " << FromEnum(response.getStatusCode());
+		Console << U"------";
+		Console << response.getHeader().rtrimmed();
+		Console << U"------";
+
+		if (response.isOK())
+		{
+			Console << TextReader{ path }.readAll();
+		}
+	}
+	else
+	{
+		Console << U"Failed.";
+	}
+
+	return initializeFromJSON(path);
+	// return { board, patterns };
+}
+
+void postAnswer(const URL& url, const String token, const FilePath& path) {
+
+	const HashTable<String, String> headers = { { U"Procon-Token", token }, {U"Content-Type", U"application/json"} };
+	/*const std::string data = JSON
+	{
+		{ U"body", U"Hello, Siv3D!" },
+		{ U"date", DateTime::Now().format() },
+	}.formatUTF8();*/
+	const std::string data = JSON::Load(path).formatUTF8();
+	const FilePath saveFilePath = U"post_result.json";
+
+	if (auto response = SimpleHTTP::Post(url, headers, data.data(), data.size(), saveFilePath))
+	{
+		Console << U"------";
+		Console << response.getStatusLine().rtrimmed();
+		Console << U"status code: " << FromEnum(response.getStatusCode());
+		Console << U"------";
+		Console << response.getHeader().rtrimmed();
+		Console << U"------";
+
+		if (response.isOK())
+		{
+			Console << TextReader{ saveFilePath }.readAll();
+		}
+	}
+	else
+	{
+		Console << U"Failed.";
+	}
+}
 
 // 学習用のデータ生成
 void generateData(int32 width, int32 height, int32 moveCount) {
@@ -64,6 +122,9 @@ void generateData(int32 width, int32 height, int32 moveCount) {
 
 
 void Main() {
+
+
+
 	// Window::Resize(1920, 1080);
 	const auto monitor = System::EnumerateMonitors()[0];
 
@@ -72,10 +133,18 @@ void Main() {
 	FontAsset::Register(U"Button", 30, Typeface::Bold);
 	Scene::SetBackground(ColorF{ 0.8, 1.0, 0.9 });
 
+	// PCどうしでやるときはIPアドレスとportを書き換える
+	const URL url = U"192.168.154.167:3000";
+	const URL getUrl = U"{}/problem"_fmt(url);
+	Console << getUrl;
+	const URL postUrl = U"{}/answer"_fmt(url);
 
+	// tokenはもらったやつを使う
+	const String token = U"token1";
+	auto [board, patterns] = initializeFromGet(getUrl, token, U"_input.json");
 
 	// JSONファイルからゲームを初期化
-	auto [board, patterns] = initializeFromJSON(U"input.json");
+	// auto [board, patterns] = initializeFromJSON(U"input.json");
 	int32 cellSize = Min(1024 / board.grid.width(), 1024 / board.grid.height());
 	int32 currentPattern = 0;
 	Point patternPos(0, 0);
@@ -116,7 +185,8 @@ void Main() {
 			resetFailProof++;
 			if (resetFailProof == 10) {
 				resetFailProof = 0;
-				board = initializeFromJSON(U"input.json").first;
+				// board = initializeFromJSON(U"input.json").first;
+				board = initializeFromGet(getUrl, token, U"_input.json").first;
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
 			}
 		}
@@ -272,6 +342,8 @@ void Main() {
 					}
 				}
 				solution.outuputToJson();
+				postAnswer(postUrl, token, U"output.json");
+				Console << postUrl;
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
 			}
 			if (KeyD.down()) {
