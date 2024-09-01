@@ -1074,6 +1074,10 @@ namespace Algorithm {
 
 
 		auto compareStates = [](const State& a, const State& b) {
+			// そろっている部分が多いときに使うと手数が削減される場合がある
+			/*if (a.score == b.score) {
+				return a.board.calculateDifference(a.board.grid) > b.board.calculateDifference(b.board.grid);
+			}*/
 			return a.score < b.score; // スコアが高い方が優先
 			// return a.score > b.score; // スコアが低い方が優先
 			};

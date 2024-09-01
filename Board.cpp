@@ -49,7 +49,7 @@ int32 Board::calculateDifference(const Grid<int32>& otherGrid) const {
 			}
 		}
 	}
-	Console << U"diff: {}"_fmt(diff);
+	// Console << U"diff: {}"_fmt(diff);
 	return diff;
 }
 
@@ -95,12 +95,13 @@ void Board::draw() const {
 	const int32 cellSize = Min(1024 / grid.width(), 1024 / grid.height());
 	const ColorF gridColor(0.5, 0.5, 0.5);  // グリッドの色（灰色）
 	const ColorF cellColor(0.8, 0.9, 1.0);  // セルの色（薄い青）
-
+	static const ColorF deepBlue(0.11f, 0.29f, 0.40f);
+	static  const ColorF cream(0.96f, 0.92f, 0.82f);
 	for (int32 y = 0; y < height; ++y) {
 		for (int32 x = 0; x < width; ++x) {
 			// セルの描画
 
-			Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ? Palette::Aqua : Palette::Black));
+			Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ?  deepBlue  : cream));
 			FontAsset(U"Cell")(grid[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
 
 
@@ -480,3 +481,19 @@ std::vector<std::pair<int32, int32>> Board::sortToMatchPartially(int32 targetRow
 	return swaps;
 }
 
+int32 Board::calculateNextDifference(const Pattern& pattern, Point pos, int32 direction) const {
+	Board newBoard = this->applyPatternCopy(pattern, pos, direction);
+	int32 diff = 0;
+	for (int32 y = 0; y < height; ++y) {
+		for (int32 x = 0; x < width; ++x) {
+			if (goal[y][x] != newBoard.grid[y][x]) {
+				diff++;
+			}
+		}
+	}
+	return diff;
+}
+
+int32 Board::calculateNextProgress(const Pattern& pattern, Point pos, int32 direction) const {
+	return height * width - calculateNextDifference(pattern, pos, direction);
+}
