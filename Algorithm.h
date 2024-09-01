@@ -48,7 +48,7 @@ namespace Algorithm {
 			Console << U"Wrote ";
 			JSON submission;
 			try {
-				submission = JSON::Load(U"output.json");
+				// submission = JSON::Load(U"output.json");
 				const FilePath path = FileSystem::FullPath(U"output.json");
 				Console << U"Full path: " << path;
 				JSON submission = JSON::Load(path);
