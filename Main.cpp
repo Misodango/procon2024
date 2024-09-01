@@ -33,7 +33,7 @@ std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 	catch (const Error& error) {
 		Console << U"Error loading JSON: " << error.what();
 	}
-
+	static_cast<void>(board.BFSbyPopcount(Point(0, 0), 0));
 	return { board, patterns };
 }
 
@@ -183,6 +183,8 @@ void Main() {
 		}
 		if (resetButton.leftClicked()) {
 			resetFailProof++;
+			// resetボタン付近の座標が片貫に適用されてしまうのを防ぐためにモードを変更
+			currentMode = GameMode::Auto;
 			if (resetFailProof == 10) {
 				resetFailProof = 0;
 				board = initializeFromJSON(U"input.json").first;
@@ -305,19 +307,22 @@ void Main() {
 		}
 		if (currentMode == GameMode::Manual) {
 			if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0) patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
-			// 入力処理
-			if (KeyLeft.down()) patternPos.x = Max(-patternWidth + 1, patternPos.x - 1);
-			if (KeyRight.down()) patternPos.x = Min(board.width - 1, patternPos.x + 1);
-			if (KeyUp.down()) patternPos.y = Max(-patternHeight + 1, patternPos.y - 1);
-			if (KeyDown.down()) patternPos.y = Min(board.height - 1, patternPos.y + 1);
-			if (KeyTab.down()) {
-				currentPattern = (currentPattern + 1) % patterns.size();
-				patternHeight = patterns[currentPattern].grid.height();
-				patternWidth = patterns[currentPattern].grid.width();
-				patternPos = Point(0, 0);
+			if (Cursor::Pos().x >= 1024 || Cursor::Pos().y >= 1024);
+			else {
+				// 入力処理
+				if (KeyLeft.down()) patternPos.x = Max(-patternWidth + 1, patternPos.x - 1);
+				if (KeyRight.down()) patternPos.x = Min(board.width - 1, patternPos.x + 1);
+				if (KeyUp.down()) patternPos.y = Max(-patternHeight + 1, patternPos.y - 1);
+				if (KeyDown.down()) patternPos.y = Min(board.height - 1, patternPos.y + 1);
+				if (KeyTab.down()) {
+					currentPattern = (currentPattern + 1) % patterns.size();
+					patternHeight = patterns[currentPattern].grid.height();
+					patternWidth = patterns[currentPattern].grid.width();
+					patternPos = Point(0, 0);
+				}
+				if (KeyR.down()) direction = (direction + 1) % 4;
+				if (KeySpace.down() || MouseL.down()) board.apply_pattern(patterns[currentPattern], patternPos, direction);
 			}
-			if (KeyR.down()) direction = (direction + 1) % 4;
-			if (KeySpace.down() || MouseL.down()) board.apply_pattern(patterns[currentPattern], patternPos, direction);
 		}
 		else {
 			if (KeyTab.down()) {
@@ -343,7 +348,7 @@ void Main() {
 					}
 				}
 				solution.outuputToJson();
-				postAnswer(postUrl, token, U"output.json");
+				// postAnswer(postUrl, token, U"output.json");
 				Console << postUrl;
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
 			}
