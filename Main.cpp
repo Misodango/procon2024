@@ -122,16 +122,30 @@ void generateData(int32 width, int32 height, int32 moveCount) {
 
 
 void Main() {
-
-
-
 	// Window::Resize(1920, 1080);
 	const auto monitor = System::EnumerateMonitors()[0];
 
 	Window::Resize(monitor.fullscreenResolution);
 	FontAsset::Register(U"Cell", 20);
 	FontAsset::Register(U"Button", 30, Typeface::Bold);
-	Scene::SetBackground(ColorF{ 0.8, 1.0, 0.9 });
+	Scene::SetBackground(Palette::White);
+
+	// 新しい色（ボタン用）
+	const ColorF sakura(1.0f, 0.71f, 0.76f);         // 桜色
+	const ColorF matcha(0.56f, 0.68f, 0.43f);        // 抹茶色
+	const ColorF kuroKinu(0.16f, 0.16f, 0.16f);      // 黒絹色（濃い黒）
+	const ColorF kazAttari(0.84f, 0.60f, 0.35f);     // 櫨染（はじぞめ）色
+	const ColorF asaGiri(0.68f, 0.76f, 0.78f);       // 朝霧色
+	const ColorF cream(0.96f, 0.92f, 0.82f);         // 生成り色
+	const ColorF scarlet(0.827, 0.220, 0.110); // 緋色
+	const ColorF orange(0.965, 0.678, 0.286); // 柑子色
+	const ColorF oldBamboo(0.463, 0.569, 0.392); // 老竹色
+	const ColorF seaweed(0.353, 0.329, 0.294); // 海松色
+	const ColorF darkScarlet(0.627, 0.120, 0.010); // 暗い緋色
+	const ColorF darkOrange(0.765, 0.478, 0.086); // 暗い柑子色
+	const ColorF darkOldBamboo(0.263, 0.369, 0.192); // 暗い老竹色
+	const ColorF lightSeaweed(0.553, 0.529, 0.494); // 明るい
+
 
 	// PCどうしでやるときはIPアドレスとportを書き換える
 	const URL url = U"192.168.154.167:3000";
@@ -141,10 +155,10 @@ void Main() {
 
 	// tokenはもらったやつを使う
 	const String token = U"token1";
-	auto [board, patterns] = initializeFromGet(getUrl, token, U"_input.json");
+	// auto [board, patterns] = initializeFromGet(getUrl, token, U"_input.json");
 
 	// JSONファイルからゲームを初期化
-	// auto [board, patterns] = initializeFromJSON(U"input.json");
+	auto [board, patterns] = initializeFromJSON(U"input.json");
 	int32 cellSize = Min(1024 / board.grid.width(), 1024 / board.grid.height());
 	int32 currentPattern = 0;
 	Point patternPos(0, 0);
@@ -157,15 +171,21 @@ void Main() {
 		Algorithm::Type::ChokudaiSearch };
 	GameMode currentMode = GameMode::Manual;
 	int32 currentAlgorithm = 0;
-	Rect manualButton(1000, 650, 200, 50);
-	Rect algorithmButton(1350, 650, 200, 50);
-	Rect autoButton(1350, 900, 200, 50);
-	Rect resetButton(1600, 650, 200, 50);
+	Rect manualButton(1100, 674, 200, 50);
+	Rect algorithmButton(1100, 774, 200, 50);
+	Rect autoButton(1100, 874, 200, 50);
+	Rect resetButton(1100, 974, 200, 50); // 1024 - 50
 	// リセット誤爆防止 10回押したらリセットされる
 	int32 resetFailProof = 0;
 	Array<String> algorithmNames = { U"Greedy", U"BeamSearch", U"DP", U"RowGreedy", U"RowGreedy改", U"OneByOne", U"Diagonal", U"Annealing", U"dijkstra" , U"水平スワップソート", U"chokudai" };
 
+	// マウス入力（座標のみ）を無視するかどうか
+	// m キーで切り替え
+	bool readMouseInput = 1; // 1 -> 入力
+
+
 	double progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
+	double nextProgress = progress;
 
 	Algorithm::Solution answer;
 
@@ -183,7 +203,7 @@ void Main() {
 		}
 		if (resetButton.leftClicked()) {
 			resetFailProof++;
-			// resetボタン付近の座標が片貫に適用されてしまうのを防ぐためにモードを変更
+			// resetボタン付近の座標が型抜きに適用されてしまうのを防ぐためにモードを変更
 			currentMode = GameMode::Auto;
 			if (resetFailProof == 10) {
 				resetFailProof = 0;
@@ -306,8 +326,11 @@ void Main() {
 			Console << elapsedTime << U"sec";
 		}
 		if (currentMode == GameMode::Manual) {
-			if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0) patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
-			if (Cursor::Pos().x >= 1024 || Cursor::Pos().y >= 1024);
+			if (KeyM.down()) {
+				readMouseInput ^= 1;
+			}
+			if (readMouseInput && Cursor::Pos().x < 1024 && Cursor::Pos().y < 1024) if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0) patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
+
 			else {
 				// 入力処理
 				if (KeyLeft.down()) patternPos.x = Max(-patternWidth + 1, patternPos.x - 1);
@@ -322,6 +345,8 @@ void Main() {
 				}
 				if (KeyR.down()) direction = (direction + 1) % 4;
 				if (KeySpace.down() || MouseL.down()) board.apply_pattern(patterns[currentPattern], patternPos, direction);
+				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
+				nextProgress = 100.0 * board.calculateNextProgress(patterns[currentPattern], patternPos, direction) / double(board.grid.height() * board.grid.width());
 			}
 		}
 		else {
@@ -410,20 +435,20 @@ void Main() {
 
 
 		// モード切り替えボタンの描画と処理
-		manualButton.draw(currentMode == GameMode::Manual ? Palette::Red : Palette::White);
-		algorithmButton.draw(currentMode == GameMode::Auto ? Palette::Blue : Palette::White);
-		autoButton.draw(Palette::Green);
-		resetButton.draw(Palette::Yellow);
-		FontAsset(U"Button")(U"Manual").drawAt(manualButton.center(), Palette::Black);
-		FontAsset(U"Button")(U"Algo").drawAt(algorithmButton.center(), Palette::Black);
-		FontAsset(U"Button")(U"Auto").drawAt(autoButton.center(), Palette::Black);
-		FontAsset(U"Button")(U"!!Reset!!").drawAt(resetButton.center(), Palette::Black);
+		manualButton.draw(currentMode == GameMode::Manual ? scarlet : cream);
+		algorithmButton.draw(currentMode == GameMode::Auto ? orange : cream);
+		autoButton.draw(oldBamboo);
+		resetButton.draw(seaweed);
+		FontAsset(U"Button")(U"Manual").drawAt(manualButton.center(), darkScarlet);
+		FontAsset(U"Button")(U"Algo").drawAt(algorithmButton.center(), darkOrange);
+		FontAsset(U"Button")(U"Auto").drawAt(autoButton.center(), darkOldBamboo);
+		FontAsset(U"Button")(U"!!Reset!!").drawAt(resetButton.center(), lightSeaweed);
 		// 情報表示
-		FontAsset(U"Cell")(U"Pattern: {}\nPosition: ({},{})\nDirection: {}\nMode: {}\nProgress: {}%"_fmt(
+		FontAsset(U"Cell")(U"Pattern: {}\nPosition: ({},{})\nDirection: {}\nMode: {}\nProgress: {}%\nPrediction: {}%\n"_fmt(
 			patterns[currentPattern].p, patternPos.x, patternPos.y, U"↑↓←→"[direction],
 			currentMode == GameMode::Manual ? U"Manual" : algorithmNames[currentAlgorithm],
-			progress))
-			.draw(1300, 300, Palette::Black);
+			progress, nextProgress))
+			.draw(1100, 300, Palette::Black);
 
 		// ゴール状態のチェック
 		if (board.is_goal()) {

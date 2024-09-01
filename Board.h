@@ -49,6 +49,10 @@ public:
 	Point BFSbyPopcount(Point start, int32 target) const;
 	std::vector<std::pair<int32, int32>> sortToMatchPartially(int32 targetRow) const;
 
+	int32 calculateNextDifference(const Pattern& pattern, Point pos, int32 direction) const;
+
+	int32 calculateNextProgress(const Pattern& pattern, Point pos, int32 direction) const;
+
 
 private:
 	void shift_up(const Array<Point>& removed_cells);
