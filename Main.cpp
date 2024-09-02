@@ -124,28 +124,19 @@ void generateData(int32 width, int32 height, int32 moveCount) {
 void Main() {
 	// Window::Resize(1920, 1080);
 	const auto monitor = System::EnumerateMonitors()[0];
-
+	const ColorF backgroundColor(U"#faeee7");
 	Window::Resize(monitor.fullscreenResolution);
 	FontAsset::Register(U"Cell", 20);
 	FontAsset::Register(U"Button", 30, Typeface::Bold);
-	Scene::SetBackground(Palette::White);
+	Scene::SetBackground(backgroundColor);
 
 	// 新しい色（ボタン用）
-	const ColorF sakura(1.0f, 0.71f, 0.76f);         // 桜色
-	const ColorF matcha(0.56f, 0.68f, 0.43f);        // 抹茶色
-	const ColorF kuroKinu(0.16f, 0.16f, 0.16f);      // 黒絹色（濃い黒）
-	const ColorF kazAttari(0.84f, 0.60f, 0.35f);     // 櫨染（はじぞめ）色
-	const ColorF asaGiri(0.68f, 0.76f, 0.78f);       // 朝霧色
-	const ColorF cream(0.96f, 0.92f, 0.82f);         // 生成り色
-	const ColorF scarlet(0.827, 0.220, 0.110); // 緋色
-	const ColorF orange(0.965, 0.678, 0.286); // 柑子色
-	const ColorF oldBamboo(0.463, 0.569, 0.392); // 老竹色
-	const ColorF seaweed(0.353, 0.329, 0.294); // 海松色
-	const ColorF darkScarlet(0.627, 0.120, 0.010); // 暗い緋色
-	const ColorF darkOrange(0.765, 0.478, 0.086); // 暗い柑子色
-	const ColorF darkOldBamboo(0.263, 0.369, 0.192); // 暗い老竹色
-	const ColorF lightSeaweed(0.553, 0.529, 0.494); // 明るい
-
+	const ColorF buttonColor(U"#ff8ba7");
+	const ColorF white(U"#fffffe");
+	const ColorF autoColor(U"#c3f0ca");
+	const ColorF resetColor(U"#ffc6c7");
+	const ColorF buttonTextColor(U"#33272a");
+	const ColorF headlineColor(U"#33272a");
 
 	// PCどうしでやるときはIPアドレスとportを書き換える
 	const URL url = U"192.168.154.167:3000";
@@ -171,10 +162,10 @@ void Main() {
 		Algorithm::Type::ChokudaiSearch };
 	GameMode currentMode = GameMode::Manual;
 	int32 currentAlgorithm = 0;
-	Rect manualButton(1100, 674, 200, 50);
-	Rect algorithmButton(1100, 774, 200, 50);
-	Rect autoButton(1100, 874, 200, 50);
-	Rect resetButton(1100, 974, 200, 50); // 1024 - 50
+	RoundRect manualButton(1100, 674, 200, 50, 5);
+	RoundRect algorithmButton(1100, 774, 200, 50, 5);
+	RoundRect autoButton(1100, 874, 200, 50, 5);
+	RoundRect resetButton(1100, 974, 200, 50, 5); // 1024 - 50
 	// リセット誤爆防止 10回押したらリセットされる
 	int32 resetFailProof = 0;
 	Array<String> algorithmNames = { U"Greedy", U"BeamSearch", U"DP", U"RowGreedy", U"RowGreedy改", U"OneByOne", U"Diagonal", U"Annealing", U"dijkstra" , U"水平スワップソート", U"chokudai" };
@@ -435,20 +426,20 @@ void Main() {
 
 
 		// モード切り替えボタンの描画と処理
-		manualButton.draw(currentMode == GameMode::Manual ? scarlet : cream);
-		algorithmButton.draw(currentMode == GameMode::Auto ? orange : cream);
-		autoButton.draw(oldBamboo);
-		resetButton.draw(seaweed);
-		FontAsset(U"Button")(U"Manual").drawAt(manualButton.center(), darkScarlet);
-		FontAsset(U"Button")(U"Algo").drawAt(algorithmButton.center(), darkOrange);
-		FontAsset(U"Button")(U"Auto").drawAt(autoButton.center(), darkOldBamboo);
-		FontAsset(U"Button")(U"!!Reset!!").drawAt(resetButton.center(), lightSeaweed);
+		manualButton.draw(currentMode == GameMode::Manual ? buttonColor : white);
+		algorithmButton.draw(currentMode == GameMode::Auto ? buttonColor : white);
+		autoButton.draw(autoColor);
+		resetButton.draw(resetColor);
+		FontAsset(U"Button")(U"Manual").drawAt(manualButton.center(), buttonTextColor);
+		FontAsset(U"Button")(U"Algo").drawAt(algorithmButton.center(), buttonTextColor);
+		FontAsset(U"Button")(U"Auto").drawAt(autoButton.center(), buttonTextColor);
+		FontAsset(U"Button")(U"!!Reset!!").drawAt(resetButton.center(), buttonTextColor);
 		// 情報表示
 		FontAsset(U"Cell")(U"Pattern: {}\nPosition: ({},{})\nDirection: {}\nMode: {}\nProgress: {}%\nPrediction: {}%\n"_fmt(
 			patterns[currentPattern].p, patternPos.x, patternPos.y, U"↑↓←→"[direction],
 			currentMode == GameMode::Manual ? U"Manual" : algorithmNames[currentAlgorithm],
 			progress, nextProgress))
-			.draw(1100, 300, Palette::Black);
+			.draw(1100, 300, headlineColor);
 
 		// ゴール状態のチェック
 		if (board.is_goal()) {

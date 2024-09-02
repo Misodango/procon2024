@@ -91,18 +91,19 @@ Board Board::applyPatternCopy(const Pattern& pattern, Point pos, int32 direction
 
 void Board::draw() const {
 	if (grid.height() > 200 || grid.width() > 200) { return; }
-	const auto monitor = System::EnumerateMonitors()[0];
 	const int32 cellSize = Min(1024 / grid.width(), 1024 / grid.height());
-	const ColorF gridColor(0.5, 0.5, 0.5);  // グリッドの色（灰色）
-	const ColorF cellColor(0.8, 0.9, 1.0);  // セルの色（薄い青）
-	static const ColorF deepBlue(0.11f, 0.29f, 0.40f);
-	static  const ColorF cream(0.96f, 0.92f, 0.82f);
+	static const ColorF gridColor(U"#594a4e");  // グリッドの色（灰色）
+	static const ColorF cellColor(0.8, 0.9, 1.0);  // セルの色（薄い青）
+	static const ColorF correctTileColor(U"#ff8906");
+	static  const ColorF wrongTileColor(U"#fffffe");
+	static const ColorF textColor(U"#594a4e");
+	static const ColorF frameColor(U"#594a4e");
 	for (int32 y = 0; y < height; ++y) {
 		for (int32 x = 0; x < width; ++x) {
 			// セルの描画
 
-			Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ?  deepBlue  : cream));
-			FontAsset(U"Cell")(grid[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2);
+			Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ?  correctTileColor : wrongTileColor));
+			FontAsset(U"Cell")(grid[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
 
 
 			// グリッドの線を描画
@@ -111,7 +112,7 @@ void Board::draw() const {
 	}
 
 	// ボード全体の外枠を描画
-	Rect(0, 0, width * cellSize, height * cellSize).drawFrame(2, Palette::Navy);
+	Rect(0, 0, width * cellSize, height * cellSize).drawFrame(2, frameColor);
 
 }
 
