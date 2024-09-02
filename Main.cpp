@@ -124,18 +124,19 @@ void generateData(int32 width, int32 height, int32 moveCount) {
 void Main() {
 	// Window::Resize(1920, 1080);
 	const auto monitor = System::EnumerateMonitors()[0];
-	const ColorF backgroundColor(U"#faeee7");
+	// const ColorF backgroundColor(U"#faeee7");
+	const ColorF backgroundColor(U"#fffffe");
 	Window::Resize(monitor.fullscreenResolution);
 	FontAsset::Register(U"Cell", 20);
 	FontAsset::Register(U"Button", 30, Typeface::Bold);
 	Scene::SetBackground(backgroundColor);
 
 	// 新しい色（ボタン用）
-	const ColorF buttonColor(U"#ff8ba7");
-	const ColorF white(U"#fffffe");
-	const ColorF autoColor(U"#c3f0ca");
-	const ColorF resetColor(U"#ffc6c7");
-	const ColorF buttonTextColor(U"#33272a");
+	const ColorF buttonColor(U"#094067");
+	const ColorF white(U"#d8eefe");
+	const ColorF autoColor(U"#5f6c7b");
+	const ColorF resetColor(U"#ef4565");
+	const ColorF buttonTextColor(U"#d8eefe");
 	const ColorF headlineColor(U"#33272a");
 
 	// PCどうしでやるときはIPアドレスとportを書き換える
@@ -435,10 +436,11 @@ void Main() {
 		FontAsset(U"Button")(U"Auto").drawAt(autoButton.center(), buttonTextColor);
 		FontAsset(U"Button")(U"!!Reset!!").drawAt(resetButton.center(), buttonTextColor);
 		// 情報表示
-		FontAsset(U"Cell")(U"Pattern: {}\nPosition: ({},{})\nDirection: {}\nMode: {}\nProgress: {}%\nPrediction: {}%\n"_fmt(
+		FontAsset(U"Cell")(U"Pattern: {}\nPosition: ({},{})\nDirection: {}\nMode: {}\nProgress: {}%\nPrediction: {}%\nActual:{}"_fmt(
 			patterns[currentPattern].p, patternPos.x, patternPos.y, U"↑↓←→"[direction],
 			currentMode == GameMode::Manual ? U"Manual" : algorithmNames[currentAlgorithm],
-			progress, nextProgress))
+			progress, nextProgress,
+			board.goal[patternPos.y][patternPos.x]))
 			.draw(1100, 300, headlineColor);
 
 		// ゴール状態のチェック
