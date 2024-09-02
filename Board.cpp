@@ -94,10 +94,11 @@ void Board::draw() const {
 	const int32 cellSize = Min(1024 / grid.width(), 1024 / grid.height());
 	static const ColorF gridColor(U"#594a4e");  // グリッドの色（灰色）
 	static const ColorF cellColor(0.8, 0.9, 1.0);  // セルの色（薄い青）
-	static const ColorF correctTileColor(U"#ff8906");
+	static const ColorF correctTileColor(U"#3da9fc");
 	static  const ColorF wrongTileColor(U"#fffffe");
 	static const ColorF textColor(U"#594a4e");
 	static const ColorF frameColor(U"#594a4e");
+	FontAsset::Register(U"Cell", 20);
 	for (int32 y = 0; y < height; ++y) {
 		for (int32 x = 0; x < width; ++x) {
 			// セルの描画
