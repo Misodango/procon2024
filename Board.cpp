@@ -54,13 +54,14 @@ int32 Board::calculateDifference(const Grid<int32>& otherGrid) const {
 }
 
 void Board::apply_pattern(const Pattern& pattern, Point pos, int32 direction) {
-	Array<Point> removed_cells;
+	// Array<Point> removed_cells;
+	Grid<bool> isRemoved(width, height, 0);
 	for (int32 y = 0; y < pattern.grid.height(); ++y) {
 		for (int32 x = 0; x < pattern.grid.width(); ++x) {
 			if (pattern.grid[y][x] == 1) {
 				int32 bx = pos.x + x, by = pos.y + y;
 				if (0 <= bx && bx < width && 0 <= by && by < height) {
-					removed_cells << Point{ bx, by };
+					isRemoved[by][bx] = 1;
 				}
 			}
 		}
@@ -68,16 +69,16 @@ void Board::apply_pattern(const Pattern& pattern, Point pos, int32 direction) {
 
 	switch (direction) {
 	case 0: // up
-		shift_up(removed_cells);
+		shift_up(isRemoved);
 		break;
 	case 1: // down
-		shift_down(removed_cells);
+		shift_down(isRemoved);
 		break;
 	case 2: // left
-		shift_left(removed_cells);
+		shift_left(isRemoved);
 		break;
 	case 3: // right
-		shift_right(removed_cells);
+		shift_right(isRemoved);
 		break;
 	}
 }
@@ -103,7 +104,7 @@ void Board::draw() const {
 		for (int32 x = 0; x < width; ++x) {
 			// セルの描画
 
-			Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ?  correctTileColor : wrongTileColor));
+			Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ? correctTileColor : wrongTileColor));
 			FontAsset(U"Cell")(grid[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
 
 
@@ -117,12 +118,12 @@ void Board::draw() const {
 
 }
 
-void Board::shift_up(const Array<Point>& removed_cells) {
+void Board::shift_up(const Grid<bool>& isRemoved) {
 	for (int32 x = 0; x < width; ++x) {
 		Array<int32> column;
 		Array<int32> removed_in_col;
 		for (int32 y = 0; y < height; ++y) {
-			if (std::find(removed_cells.begin(), removed_cells.end(), Point{ x, y }) == removed_cells.end()) {
+			if (!isRemoved[y][x]) {
 				column << grid[y][x];
 			}
 			else {
@@ -141,12 +142,12 @@ void Board::shift_up(const Array<Point>& removed_cells) {
 	}
 }
 
-void Board::shift_down(const Array<Point>& removed_cells) {
+void Board::shift_down(const Grid<bool>& isRemoved) {
 	for (int32 x = 0; x < width; ++x) {
 		Array<int32> column;
 		Array<int32> removed_in_col;
 		for (int32 y = height - 1; y >= 0; --y) {
-			if (std::find(removed_cells.begin(), removed_cells.end(), Point{ x, y }) == removed_cells.end()) {
+			if (!isRemoved[y][x]) {
 				column << grid[y][x];
 			}
 			else {
@@ -166,12 +167,12 @@ void Board::shift_down(const Array<Point>& removed_cells) {
 	}
 }
 
-void Board::shift_left(const Array<Point>& removed_cells) {
+void Board::shift_left(const Grid<bool>& isRemoved) {
 	for (int32 y = 0; y < height; ++y) {
 		Array<int32> row;
 		Array<int32> removed_in_row;
 		for (int32 x = 0; x < width; ++x) {
-			if (std::find(removed_cells.begin(), removed_cells.end(), Point{ x, y }) == removed_cells.end()) {
+			if (!isRemoved[y][x]) {
 				row << grid[y][x];
 			}
 			else {
@@ -191,12 +192,12 @@ void Board::shift_left(const Array<Point>& removed_cells) {
 	}
 }
 
-void Board::shift_right(const Array<Point>& removed_cells) {
+void Board::shift_right(const Grid<bool>& isRemoved) {
 	for (int32 y = 0; y < height; ++y) {
 		Array<int32> row;
 		Array<int32> removed_in_row;
 		for (int32 x = width - 1; x >= 0; --x) {
-			if (std::find(removed_cells.begin(), removed_cells.end(), Point{ x, y }) == removed_cells.end()) {
+			if (!isRemoved[y][x]) {
 				row << grid[y][x];
 			}
 			else {
