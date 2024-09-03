@@ -55,10 +55,10 @@ public:
 
 
 private:
-	void shift_up(const Array<Point>& removed_cells);
-	void shift_down(const Array<Point>& removed_cells);
-	void shift_left(const Array<Point>& removed_cells);
-	void shift_right(const Array<Point>& removed_cells);
+	void shift_up(const Grid<bool>& isRemoved);
+	void shift_down(const Grid<bool>& isRemoved);
+	void shift_left(const Grid<bool>& isRemoved);
+	void shift_right(const Grid<bool>& isRemoved);
 	int32 calculateDistance(int32 x1, int32 y1, int32 x2, int32 y2) const;
 	
 };
