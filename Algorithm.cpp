@@ -651,6 +651,7 @@ namespace Algorithm {
 		for (int32 x : step(initialBoad.grid.width())) {
 			for (int32 y : step(initialBoad.grid.height())) {
 				if (initialBoad.grid[y][x] == initialBoad.goal[y][x]) continue;
+
 				for (const auto& dy : bitDy) {
 					Solution solution;
 					int32 ny = y + dy;
@@ -945,105 +946,250 @@ namespace Algorithm {
 		solution.grid = board.grid;
 		return solution;
 	}
+	class OptimizedBoard {
+	private:
+		std::vector<uint64_t> grid;
+		std::vector<uint64_t> goal;
+		static constexpr int CELLS_PER_UINT64 = 32;
+		static constexpr uint64_t MASK = 0x3; // 11 in binary
 
-	Solution chokudaiSearch(const Board& board, const Array<Pattern>& patterns) {
-		static const int16 height = board.grid.height();
-		static const int16 width = board.grid.width();
-		static const int16 beamWidth = 1000;
-		static const int16 beamDepth = height * width;
-		static const int16 beamNumber = 1;
-		struct State {
-
-			Board board;
-			Solution solution;
-			int32 score;
-			State(const Board& b, const Solution& s, int32 sc) :board(b), solution(s), score(sc) {}
-		};
-
-		auto progress = [](const Board& a) {
-			int32 res = 0;
-			for (int32 x : step(a.width)) {
-				for (int32 y : step(a.height)) {
-					if (a.grid[y][x] != a.goal[y][x]) return res;
-					res++;
-				}
-			}
-			return res;
-			};
-		auto compareStates = [](const State& a, const State& b) {
-			return a.score < b.score; // スコアが高い方が優先
-			// return a.score > b.score; // スコアが低い方が優先
-			};
-
-
-
-		Solution solution;
-		State state(board, solution, progress(board));
-
-		std::vector<std::priority_queue<State, std::vector<State>, decltype(compareStates)>> beam(beamDepth + 1);
-		for (int32 depth : step(beamDepth + 1)) {
-			beam[depth] = std::priority_queue<State, std::vector<State>, decltype(compareStates)>(compareStates);
+	public:
+		int width, height;
+		OptimizedBoard(int w, int h) : width(w), height(h) {
+			int cellCount = width * height;
+			int uint64Count = (cellCount + CELLS_PER_UINT64 - 1) / CELLS_PER_UINT64;
+			grid.resize(uint64Count, 0);
 		}
-		// beam[0].push(state);
-		beam[0].emplace(board, Solution(), board.calculateDifference(board.goal));
-		for (int32 cnt : step(beamNumber)) {
-			for (int32 depth : step(beamDepth)) {
-				auto& currentBeam = beam[depth];
-				auto& nextBeam = beam[depth + 1];
-				for (int32 wid : step(beamWidth)) {
-					if (currentBeam.empty()) {
-						break;
-					}
 
-					State currentState = currentBeam.top();
-					if (currentState.board.is_goal()) {
-						break;
-					}
+		OptimizedBoard(int w, int h, const Grid<int>& gr, const Grid<int>& go) :width(w), height(h) {
+			int cellCount = width * height;
+			int uint64Count = (cellCount + CELLS_PER_UINT64 - 1) / CELLS_PER_UINT64;
+			grid.resize(uint64Count, 0);
+			goal.resize(uint64Count, 0);
+			setGrid(gr);
+			setGoal(go);
+		}
 
-					currentBeam.pop();
+		void set(int x, int y, int value) {
+			int index = y * width + x;
+			int arrayIndex = index / CELLS_PER_UINT64;
+			int bitIndex = (index % CELLS_PER_UINT64) * 2;
 
-					const auto& legalActions = nextState(currentState.board, patterns);
-					for (const auto& solutions : legalActions) {
-						Board nextBoard = currentState.board;
-						int32 stepSize = solutions.steps.size();
-						Solution nextSolution;
-						for (const auto& action : solutions.steps) {
-							const auto& [pattern, point, direction] = action;
-							// Console << U"point{}, dir{}"_fmt(point, direction);
-							nextBoard.apply_pattern(pattern, point, direction);
-							nextSolution.steps.push_back(action);
-							currentState.solution.steps.push_back(action);
-						}
-						double delta = progress(nextBoard) - progress(currentState.board);
-						// double acc = 1 - double(nextBoard.calculateDifference(nextBoard.grid) / (height * width));
-						double newScore = delta / stepSize;// *acc;
+			uint64_t clearMask = ~(MASK << bitIndex);
+			grid[arrayIndex] = (grid[arrayIndex] & clearMask) |
+				(static_cast<uint64_t>(value) << bitIndex);
+		}
 
-						Console << U"score:" << newScore;
-						Console << U"new Prog, before ,Prog:" << Point(progress(nextBoard), progress(currentState.board));
-						State newState = State(nextBoard, currentState.solution, newScore);
+		int get(int x, int y) const {
+			int index = y * width + x;
+			int arrayIndex = index / CELLS_PER_UINT64;
+			int bitIndex = (index % CELLS_PER_UINT64) * 2;
 
-						if (depth == 0) {
-							newState.solution = nextSolution;
-						}
-						for (int32 _ : step(stepSize)) currentState.solution.steps.pop_back();
-						nextBeam.emplace(newState);
+			return (grid[arrayIndex] >> bitIndex) & MASK;
+		}
 
-
-						// }
-					}
+		void setGrid(const Grid<int>& grid) {
+			for (int i : step(grid.height())) {
+				for (int j : step(grid.width())) {
+					set(j, i, grid[i][j]);
 				}
 			}
 		}
 
-		for (int32 depth : step(beamDepth, 0, -1)) {
-			const auto& currentBeam = beam[depth];
-
-			if (!currentBeam.empty()) {
-				return currentBeam.top().solution;
+		void setGoal(const Grid<int>& goal) {
+			for (int i : step(goal.height())) {
+				for (int j : step(goal.width())) {
+					set(j, i, goal[i][j]);
+				}
 			}
 		}
 
-		return dynamicProgramming(board, patterns, 0);
+		void print() {
+			for (int i = 0; i < height; i++) {
+				for (int j = 0; j < width; j++) {
+					std::cout << get(j, i) << " ";
+				}
+				std::cout << "\n";
+			}
+		}
+
+		void shift_up(const std::vector<uint64_t>& isRemoved) {
+			for (int x = 0; x < width; ++x) {
+				uint64_t column = 0;
+				int writePos = 0;
+
+				for (int y = 0; y < height; ++y) {
+					if (!(isRemoved[y / 64] & (1ULL << (y % 64)))) {
+						int value = get(x, y);
+						column |= static_cast<uint64_t>(value) << (writePos * 2);
+						writePos++;
+					}
+				}
+
+				// Write back the shifted column
+				for (int y = 0; y < height; ++y) {
+					int value = (column >> (y * 2)) & MASK;
+					set(x, y, value);
+				}
+			}
+		}
+
+		void shift_down(const std::vector<std::uint64_t>& isRemoved) {
+			for (int x = 0; x < width; x++) {
+				uint64_t column = 0;
+				int writePos = 0;
+
+				for (int y = height - 1; y >= 0; y--) {
+					if (!(isRemoved[y / 64] & (1ULL << (y % 64)))) {
+						int value = get(x, y);
+						column |= static_cast<uint64_t>(value) << (writePos * 2);
+						writePos++;
+					}
+				}
+				for (int y = height - 1; y >= 0; y--) {
+					int value = (column >> ((height - 1 - y) * 2)) & MASK;
+					set(x, y, value);
+				}
+			}
+		}
+
+		void shift_left(const std::vector<std::uint64_t>& isRemoved) {
+			for (int y = 0; y < height; ++y) {
+				uint64_t row = 0;
+				int writePos = 0;
+
+				for (int x = 0; x < width; ++x) {
+					if (!(isRemoved[y / 64] & (1ULL << (y % 64)))) {
+						int value = get(x, y);
+						row |= static_cast<uint64_t>(value) << (writePos * 2);
+						writePos++;
+					}
+				}
+
+				// Write back the shifted row
+				for (int x = 0; x < width; ++x) {
+					int value = (row >> (x * 2)) & MASK;
+					set(x, y, value);
+				}
+			}
+		}
+
+		void shift_right(const std::vector<std::uint64_t>& isRemoved) {
+			for (int y = 0; y < height; ++y) {
+				uint64_t row = 0;
+				int writePos = 0;
+
+				for (int x = width - 1; x >= 0; --x) {
+					if (!(isRemoved[y / 64] & (1ULL << (y % 64)))) {
+						int value = get(x, y);
+						row |= static_cast<uint64_t>(value) << (writePos * 2);
+						writePos++;
+					}
+				}
+
+				// Write back the shifted row
+				for (int x = width - 1; x >= 0; --x) {
+					int value = (row >> ((width - 1 - x) * 2)) & MASK;
+					set(x, y, value);
+				}
+			}
+		}
+
+		void apply_pattern(const std::vector<std::vector<int>>& pattern, int pos_x,
+						   int pos_y, int direction) {
+			std::vector<uint64_t> isRemoved((height + 63) / 64, 0);
+
+			for (int y = 0; y < pattern.size(); ++y) {
+				for (int x = 0; x < pattern[y].size(); ++x) {
+					if (pattern[y][x] == 1) {
+						int bx = pos_x + x, by = pos_y + y;
+						if (0 <= bx && bx < width && 0 <= by && by < height) {
+							isRemoved[by / 64] |= (1ULL << (by % 64));
+						}
+					}
+				}
+			}
+
+			switch (direction) {
+			case 0: // up
+				shift_up(isRemoved);
+				break;
+			case 1: // down
+				shift_down(isRemoved);
+				break;
+			case 2: // left
+				shift_left(isRemoved);
+				break;
+			case 3: // right
+				shift_right(isRemoved);
+				break;
+			}
+		}
+
+		// 何マスまで揃っているか
+		int getCorrectCount() {
+			// gridとgoalで順番にtraverse
+			// 違う数字がでてきたらuint64_tを2bit=>グリッド１マス分ごとに二分探索？
+
+		}
+	};
+
+	Array<Solution> optimizedNextState(const OptimizedBoard& initialBoard, const Array<Pattern>& patterns) {
+		Array<Solution> solutions;
+		int32 width = initialBoard.width, height = initialBoard.height;
+
+		static const int bitDy[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+		static const int bitDx[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+
+		for (int y = 0; y < height; ++y) {
+			for (int x = 0; x < width; ++x) {
+				// if (initialBoard.get(x, y) == /* goal value at (x,y) */) continue;
+				/* 気合でどこまであっているかを調べる　*/
+
+				for (const auto& dy : bitDy) {
+					Solution solution;
+					int ny = y + dy;
+					if (ny >= height) continue;
+					// get -> grid(x,y)に変更
+					// goal(x,y)を作る
+					if (initialBoard.get(x, ny) != /* goal value at (x,y) */) continue;
+					int bit = static_cast<int>(std::log2(dy));
+					const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+					int dir = (dy < 0) ? 1 : 0; // 0 for up, 1 for down
+					solution.steps.emplace_back(pattern, Point(x, y), dir);
+					if (!solution.steps.empty()) solutions.push_back(solution);
+				}
+
+				for (const auto& dx : bitDx) {
+					Solution solution;
+					int nx = x + dx;
+					if (nx >= width) continue;
+					if (initialBoard.get(nx, y) != /* goal value at (x,y) */) continue;
+					int bit = static_cast<int>(std::log2(dx));
+					const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+					solution.steps.emplace_back(pattern, Point(x, y), 2); // 2 for left
+					if (!solution.steps.empty()) solutions.push_back(solution);
+				}
+
+				if (!solutions.empty()) return solutions;
+			}
+		}
+
+		// If no solution found, call dynamicProgramming
+		solutions.push_back(dynamicProgramming(initialBoard, patterns, 0));
+		return solutions;
+	}
+
+	Solution chokudaiSearch(const Board& initialBoard, const Array<Pattern>& patterns) {
+		static const int height = initialBoard.height;
+		static const int width = initialBoard.width;
+
+		OptimizedBoard board(width, height, initialBoard.grid, initialBoard.goal);
+
+
+
+
+		return Solution();
 	}
 
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns, int32 beamWidth, int32 maxSteps) {
@@ -1071,6 +1217,7 @@ namespace Algorithm {
 				}
 			}
 			};
+
 
 
 		auto compareStates = [](const State& a, const State& b) {
@@ -1107,8 +1254,8 @@ namespace Algorithm {
 						const auto& [pattern, point, direction] = action;
 						// Console << U"point{}, dir{}"_fmt(point, direction);
 						nextBoard.apply_pattern(pattern, point, direction);
-						nextSolution.steps.push_back(action);
-						currentState.solution.steps.push_back(action);
+						nextSolution.steps.emplace_back(action);
+						currentState.solution.steps.emplace_back(action);
 					}
 					int32 prog = progress(nextBoard);
 					double delta = prog - currentState.progress;
@@ -1117,7 +1264,7 @@ namespace Algorithm {
 					// double newScore = delta / stepSize * acc;
 					// Console << U"score:" << newScore;
 					State newState = State(nextBoard, currentState.solution, newScore, prog);
-					
+
 					if (t == 0) {
 						newState.solution = nextSolution;
 					}
@@ -1139,6 +1286,7 @@ namespace Algorithm {
 				Console << elapsedTime << U"sec";
 				break;
 			}
+
 		}
 		return bestState.solution;
 	}
@@ -1151,7 +1299,7 @@ namespace Algorithm {
 			return greedy(initialBoard, patterns);
 
 		case Type::BeamSearch:
-			return beamSearch(initialBoard, patterns, 5, 100);
+			return beamSearch(initialBoard, patterns, 50, 100);
 
 		case Type::DynamicProgramming:
 			return dynamicProgramming(initialBoard, patterns, 5);
