@@ -91,21 +91,25 @@ Board Board::applyPatternCopy(const Pattern& pattern, Point pos, int32 direction
 }
 
 void Board::draw() const {
-	if (grid.height() > 200 || grid.width() > 200) { return; }
+
 	const int32 cellSize = Min(1024 / grid.width(), 1024 / grid.height());
 	static const ColorF gridColor(U"#594a4e");  // グリッドの色（灰色）
 	static const ColorF cellColor(0.8, 0.9, 1.0);  // セルの色（薄い青）
 	static const ColorF correctTileColor(U"#3da9fc");
 	static  const ColorF wrongTileColor(U"#fffffe");
-	static const ColorF textColor(U"#594a4e");
+	static const ColorF textColor(U"#d8eefe");
 	static const ColorF frameColor(U"#594a4e");
+	static const ColorF colors[] = { ColorF(U"#5f6c7b") , ColorF(U"#ef4565") ,ColorF(U"#094067") ,ColorF(U"#33272a") };
 	FontAsset::Register(U"Cell", 20);
+	static const Font font{ cellSize };
 	for (int32 y = 0; y < height; ++y) {
 		for (int32 x = 0; x < width; ++x) {
 			// セルの描画
 
-			Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ? correctTileColor : wrongTileColor));
-			FontAsset(U"Cell")(grid[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
+			// Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ? colors[grid[y][x]] : wrongTileColor));
+			Rect(x * cellSize, y * cellSize, cellSize).draw(colors[grid[y][x]]);
+			// FontAsset(U"Cell")(grid[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
+			if (goal[y][x] != grid[y][x]) font(goal[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
 
 
 			// グリッドの線を描画
@@ -374,6 +378,7 @@ Point Board::BFSbyPopcount(Point start, int32 target) const {
 	else {
 
 		for (int32 y1 : step(height)) {
+			Console << U"y1: " << y1;
 			for (int32 x1 : step(width)) {
 				for (int32 y2 : step(height)) {
 					for (int32 x2 : step(width)) {
@@ -385,7 +390,8 @@ Point Board::BFSbyPopcount(Point start, int32 target) const {
 						if (abs(dx) + abs(dy) == 1) dist += 2; // 大きいものを使いたい
 						// Point(y1, x1) -> int32
 						distances[y1 * width + x1][y2 * width + x2] = dist;
-						sortedDistances[y1][x1].push_back({ dist, Point(x2, y2) });
+						// sortedDistances[y1][x1].push_back({ dist, Point(x2, y2) });
+						sortedDistances[y1][x1].emplace_back(std::pair(dist, Point(x2, y2)));
 					}
 				}
 

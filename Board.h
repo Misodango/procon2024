@@ -9,7 +9,7 @@ public:
 	Grid<int32> grid;
 	Grid<int32> goal;
 	int32 width, height;
-
+	bool highlghtedByNum = 0;
 	Board(int32 w, int32 h);
 
 	static Board fromJSON(const JSON& json);
@@ -44,7 +44,7 @@ public:
 	Grid<int32> partialGrid(int32 sy, int32 sx) const;
 	Grid<int32> partialGoal(int32 sy, int32 sx) const;
 
-	
+
 	Point BFS(Point start, int32 target) const;
 	Point BFSbyPopcount(Point start, int32 target) const;
 	std::vector<std::pair<int32, int32>> sortToMatchPartially(int32 targetRow) const;
@@ -60,7 +60,7 @@ private:
 	void shift_left(const Grid<bool>& isRemoved);
 	void shift_right(const Grid<bool>& isRemoved);
 	int32 calculateDistance(int32 x1, int32 y1, int32 x2, int32 y2) const;
-	
+
 };
 
 // std::unordered_mapでBoardをキーとして使用するためのハッシュ関数
