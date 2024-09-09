@@ -953,6 +953,22 @@ namespace Algorithm {
 		static constexpr int CELLS_PER_UINT64 = 32;
 		static constexpr uint64_t MASK = 0x3; // 11 in binary
 
+		int calculateIndex(int x, int y) const {
+			return y * width + x;
+		}
+
+		// Helper function to calculate popcount
+		int popcount(int n) const {
+			return std::popcount(static_cast<unsigned>(n));
+			// return __builtin_popcount(n);
+		}
+
+
+		int getYFromIndex(int index) const {
+			return index / width;
+		}
+
+
 	public:
 		int width, height;
 		OptimizedBoard(int w, int h) : width(w), height(h) {
@@ -980,12 +996,30 @@ namespace Algorithm {
 				(static_cast<uint64_t>(value) << bitIndex);
 		}
 
-		int get(int x, int y) const {
+		void _set(int x, int y, int value) {
+			int index = y * width + x;
+			int arrayIndex = index / CELLS_PER_UINT64;
+			int bitIndex = (index % CELLS_PER_UINT64) * 2;
+
+			uint64_t clearMask = ~(MASK << bitIndex);
+			goal[arrayIndex] = (goal[arrayIndex] & clearMask) |
+				(static_cast<uint64_t>(value) << bitIndex);
+		}
+
+		int getGrid(int x, int y) const {
 			int index = y * width + x;
 			int arrayIndex = index / CELLS_PER_UINT64;
 			int bitIndex = (index % CELLS_PER_UINT64) * 2;
 
 			return (grid[arrayIndex] >> bitIndex) & MASK;
+		}
+
+		int getGoal(int x, int y) const {
+			int index = y * width + x;
+			int arrayIndex = index / CELLS_PER_UINT64;
+			int bitIndex = (index % CELLS_PER_UINT64) * 2;
+
+			return (goal[arrayIndex] >> bitIndex) & MASK;
 		}
 
 		void setGrid(const Grid<int>& grid) {
@@ -999,7 +1033,7 @@ namespace Algorithm {
 		void setGoal(const Grid<int>& goal) {
 			for (int i : step(goal.height())) {
 				for (int j : step(goal.width())) {
-					set(j, i, goal[i][j]);
+					_set(j, i, goal[i][j]);
 				}
 			}
 		}
@@ -1007,104 +1041,118 @@ namespace Algorithm {
 		void print() {
 			for (int i = 0; i < height; i++) {
 				for (int j = 0; j < width; j++) {
-					std::cout << get(j, i) << " ";
+					std::cout << getGrid(j, i) << " ";
 				}
 				std::cout << "\n";
 			}
 		}
 
-		void shift_up(const std::vector<uint64_t>& isRemoved) {
+		void shift_up(const Grid<bool>& isRemoved) {
 			for (int x = 0; x < width; ++x) {
-				uint64_t column = 0;
-				int writePos = 0;
-
+				std::vector<int> column;
+				std::vector<int> removed_in_col;
 				for (int y = 0; y < height; ++y) {
-					if (!(isRemoved[y / 64] & (1ULL << (y % 64)))) {
-						int value = get(x, y);
-						column |= static_cast<uint64_t>(value) << (writePos * 2);
-						writePos++;
+					if (!isRemoved[y][x]) {
+						column.push_back(getGrid(x, y));
+					}
+					else {
+						removed_in_col.push_back(getGrid(x, y));
 					}
 				}
-
-				// Write back the shifted column
-				for (int y = 0; y < height; ++y) {
-					int value = (column >> (y * 2)) & MASK;
+				int y = 0;
+				for (int value : column) {
 					set(x, y, value);
+					++y;
+				}
+				for (int value : removed_in_col) {
+					set(x, y, value);
+					++y;
 				}
 			}
 		}
 
-		void shift_down(const std::vector<std::uint64_t>& isRemoved) {
-			for (int x = 0; x < width; x++) {
-				uint64_t column = 0;
-				int writePos = 0;
-
-				for (int y = height - 1; y >= 0; y--) {
-					if (!(isRemoved[y / 64] & (1ULL << (y % 64)))) {
-						int value = get(x, y);
-						column |= static_cast<uint64_t>(value) << (writePos * 2);
-						writePos++;
+		void shift_down(const Grid<bool>& isRemoved) {
+			for (int x = 0; x < width; ++x) {
+				std::vector<int> column;
+				std::vector<int> removed_in_col;
+				for (int y = height - 1; y >= 0; --y) {
+					if (!isRemoved[y][x]) {
+						column.push_back(getGrid(x, y));
+					}
+					else {
+						removed_in_col.insert(removed_in_col.begin(), getGrid(x, y));
 					}
 				}
-				for (int y = height - 1; y >= 0; y--) {
-					int value = (column >> ((height - 1 - y) * 2)) & MASK;
+				int y = height - 1;
+				for (int value : column) {
 					set(x, y, value);
+					--y;
+				}
+				for (int value : removed_in_col) {
+					set(x, y, value);
+					--y;
 				}
 			}
 		}
 
-		void shift_left(const std::vector<std::uint64_t>& isRemoved) {
+		void shift_left(const Grid<bool>& isRemoved) {
 			for (int y = 0; y < height; ++y) {
-				uint64_t row = 0;
-				int writePos = 0;
-
+				std::vector<int> row;
+				std::vector<int> removed_in_row;
 				for (int x = 0; x < width; ++x) {
-					if (!(isRemoved[y / 64] & (1ULL << (y % 64)))) {
-						int value = get(x, y);
-						row |= static_cast<uint64_t>(value) << (writePos * 2);
-						writePos++;
+					if (!isRemoved[y][x]) {
+						row.push_back(getGrid(x, y));
+					}
+					else {
+						removed_in_row.push_back(getGrid(x, y));
 					}
 				}
-
-				// Write back the shifted row
-				for (int x = 0; x < width; ++x) {
-					int value = (row >> (x * 2)) & MASK;
+				int x = 0;
+				for (int value : row) {
 					set(x, y, value);
+					++x;
+				}
+				for (int value : removed_in_row) {
+					set(x, y, value);
+					++x;
 				}
 			}
 		}
 
-		void shift_right(const std::vector<std::uint64_t>& isRemoved) {
+		void shift_right(const Grid<bool>& isRemoved) {
 			for (int y = 0; y < height; ++y) {
-				uint64_t row = 0;
-				int writePos = 0;
-
+				std::vector<int> row;
+				std::vector<int> removed_in_row;
 				for (int x = width - 1; x >= 0; --x) {
-					if (!(isRemoved[y / 64] & (1ULL << (y % 64)))) {
-						int value = get(x, y);
-						row |= static_cast<uint64_t>(value) << (writePos * 2);
-						writePos++;
+					if (!isRemoved[y][x]) {
+						row.push_back(getGrid(x, y));
+					}
+					else {
+						removed_in_row.insert(removed_in_row.begin(), getGrid(x, y));
 					}
 				}
-
-				// Write back the shifted row
-				for (int x = width - 1; x >= 0; --x) {
-					int value = (row >> ((width - 1 - x) * 2)) & MASK;
+				int x = width - 1;
+				for (int value : row) {
 					set(x, y, value);
+					--x;
+				}
+				// std::reverse(removed_in_row.begin(), removed_in_row.end());
+				for (int value : removed_in_row) {
+					set(x, y, value);
+					--x;
 				}
 			}
 		}
 
-		void apply_pattern(const std::vector<std::vector<int>>& pattern, int pos_x,
-						   int pos_y, int direction) {
-			std::vector<uint64_t> isRemoved((height + 63) / 64, 0);
 
-			for (int y = 0; y < pattern.size(); ++y) {
-				for (int x = 0; x < pattern[y].size(); ++x) {
-					if (pattern[y][x] == 1) {
-						int bx = pos_x + x, by = pos_y + y;
+		void apply_pattern(const Pattern& pattern, Point pos, int direction) {
+			Grid<bool> isRemoved(width, height, false);
+			for (int y = 0; y < pattern.grid.height(); ++y) {
+				for (int x = 0; x < pattern.grid.width(); ++x) {
+					if (pattern.grid[y][x] == 1) {
+						int bx = pos.x + x, by = pos.y + y;
 						if (0 <= bx && bx < width && 0 <= by && by < height) {
-							isRemoved[by / 64] |= (1ULL << (by % 64));
+							isRemoved[by][bx] = true;
 						}
 					}
 				}
@@ -1124,13 +1172,106 @@ namespace Algorithm {
 				shift_right(isRemoved);
 				break;
 			}
+
 		}
 
 		// 何マスまで揃っているか
-		int getCorrectCount() {
-			// gridとgoalで順番にtraverse
-			// 違う数字がでてきたらuint64_tを2bit=>グリッド１マス分ごとに二分探索？
+		int getCorrectCount() const {
+			int count = 0;
+			int totalCells = width * height;
+			int uint64Count = (totalCells + CELLS_PER_UINT64 - 1) / CELLS_PER_UINT64;
 
+			for (int i = 0; i < uint64Count; ++i) {
+				uint64_t diff = grid[i] ^ goal[i];
+				if (diff != 0) {
+					// Find the first mismatch
+					while (diff) {
+						if (diff & MASK) {
+							return count;
+						}
+						diff >>= 2;
+						count++;
+					}
+				}
+				else {
+					count += CELLS_PER_UINT64;
+				}
+			}
+
+			return std::min(count, totalCells);
+		}
+		Point findClosestPointWithSameValue(int a, int b) const {
+			int targetValue = getGoal(a, b);
+			int targetIndex = calculateIndex(a, b);
+			std::vector<std::pair<int, int>> candidates;
+
+			// Step 1 & 2: Find all points with the same value
+			for (int y = 0; y < height; ++y) {
+				for (int x = 0; x < width; ++x) {
+					if (getGrid(x, y) == targetValue) {
+						int index = calculateIndex(x, y);
+						if (index > targetIndex) {  // Step 4: Filter condition
+							candidates.emplace_back(x, y);
+						}
+					}
+				}
+			}
+
+			if (candidates.empty()) {
+				return { -1, -1 };  // No valid point found
+			}
+
+			// Step 3 & 5: Calculate popcount differences and find the minimum
+			int minPopcountDiff = std::numeric_limits<int>::max();
+			// std::pair<int, int> closestPoint = { -1, -1 };
+			Point closestPoint = { -1, -1 };
+
+			int targetPopcount = popcount(targetIndex);
+			for (const auto& [x, y] : candidates) {
+				int index = calculateIndex(x, y);
+				int popcountDiff = std::abs(popcount(index) - targetPopcount);
+
+				if (popcountDiff < minPopcountDiff) {
+					minPopcountDiff = popcountDiff;
+					closestPoint = { x, y };
+				}
+			}
+
+			return closestPoint;
+		}
+
+		std::vector<std::pair<int, int>> findPointsWithSameValueAndYPopcountDiff1(int a, int b) const {
+			int targetValue = getGoal(a, b);
+			int targetIndex = calculateIndex(a, b);
+			int targetYPopcount = popcount(getYFromIndex(targetIndex));
+			std::vector<std::pair<int, int>> result;
+
+			for (int y = 0; y < height; ++y) {
+				int yPopcount = popcount(y);
+				if (std::abs(yPopcount - targetYPopcount) != 1) {
+					continue;  // Skip if y-popcount difference is not 1
+				}
+
+				for (int x = 0; x < width; ++x) {
+					int currentIndex = calculateIndex(x, y);
+					if (currentIndex <= targetIndex) {
+						continue;  // Skip if not farther than (a,b)
+					}
+
+					if (getGrid(x, y) == targetValue) {
+						result.emplace_back(x, y);
+					}
+				}
+			}
+
+			return result;
+		}
+
+		bool isGoal() {
+			for (int i = 0; i < width * height; i++) {
+				if (grid[i] != goal[i])return false;
+			}
+			return true;
 		}
 	};
 
@@ -1140,56 +1281,197 @@ namespace Algorithm {
 
 		static const int bitDy[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 		static const int bitDx[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
+		int correctCount = initialBoard.getCorrectCount();
+		int y = correctCount / width, x = correctCount % width;
+		// Console << U"start : " << Point(x, y);
+		// 1手で到達可能
 
-		for (int y = 0; y < height; ++y) {
-			for (int x = 0; x < width; ++x) {
-				// if (initialBoard.get(x, y) == /* goal value at (x,y) */) continue;
-				/* 気合でどこまであっているかを調べる　*/
+		const auto& candidates = initialBoard.findPointsWithSameValueAndYPopcountDiff1(x, y);
+		// Console << candidates;
+		for (const auto& candidate : candidates) {
+			// Console << U"x,y:" << Point(x, y) << U" cand:" << candidate;
+			Solution solution;
+			int  dy = candidate.second - y, dx = candidate.first - x;
+			int bit = static_cast<int>(std::log2(dy));
 
-				for (const auto& dy : bitDy) {
-					Solution solution;
-					int ny = y + dy;
-					if (ny >= height) continue;
-					// get -> grid(x,y)に変更
-					// goal(x,y)を作る
-					if (initialBoard.get(x, ny) != /* goal value at (x,y) */) continue;
-					int bit = static_cast<int>(std::log2(dy));
-					const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-					int dir = (dy < 0) ? 1 : 0; // 0 for up, 1 for down
-					solution.steps.emplace_back(pattern, Point(x, y), dir);
-					if (!solution.steps.empty()) solutions.push_back(solution);
-				}
-
-				for (const auto& dx : bitDx) {
-					Solution solution;
-					int nx = x + dx;
-					if (nx >= width) continue;
-					if (initialBoard.get(nx, y) != /* goal value at (x,y) */) continue;
-					int bit = static_cast<int>(std::log2(dx));
-					const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-					solution.steps.emplace_back(pattern, Point(x, y), 2); // 2 for left
-					if (!solution.steps.empty()) solutions.push_back(solution);
-				}
-
-				if (!solutions.empty()) return solutions;
+			if (dx > 0) {
+				solution.steps.emplace_back(patterns[22], Point(candidate.first - x - 256, y + 1), 2);
 			}
+			else if (dx < 0) {
+				solution.steps.emplace_back(patterns[22], Point(candidate.first + (width - x), y + 1), 3);
+			}
+			const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+			solution.steps.emplace_back(pattern, Point(x, y), 0);
+			solutions.emplace_back(solution);
 		}
 
+		for (const auto& dy : bitDy) {
+			Solution solution;
+			int ny = y + dy;
+			if (ny >= height) break;
+			if (initialBoard.getGrid(x, ny) != initialBoard.getGoal(x, y)) continue;
+			int bit = static_cast<int>(std::log2(dy));
+			const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+			int dir = (dy < 0) ? 1 : 0; // 0 for up, 1 for down
+			solution.steps.emplace_back(pattern, Point(x, y), dir);
+			if (!solution.steps.empty()) solutions.push_back(solution);
+		}
+
+		for (const auto& dx : bitDx) {
+			Solution solution;
+			int nx = x + dx;
+			if (nx >= width) break;
+			if (initialBoard.getGrid(nx, y) != initialBoard.getGoal(x, y)) continue;
+			int bit = static_cast<int>(std::log2(dx));
+			const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+			solution.steps.emplace_back(pattern, Point(x, y), 2); // 2 for left
+			if (!solution.steps.empty()) solutions.push_back(solution);
+		}
+		if (solutions.empty()) {
+			Solution solution;
+			const auto& [ny, nx] = initialBoard.findClosestPointWithSameValue(x, y);
+			Console << U"nx, ny:" << Point(nx, ny);
+			int dx = nx - x;
+			if (dx > 0) {
+				solution.steps.emplace_back(patterns[22], Point(dx - 256, y + 1), 2);
+			}
+			else if (dx < 0) {
+				solution.steps.emplace_back(patterns[22], Point(width + dx, y + 1), 3);
+			}
+			/*int bit = std::log2(static_cast<unsigned>(ny - y));
+			Console << U"bit:{}"_fmt(bit);*/
+
+			/*const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];*/
+			solution.steps.emplace_back(patterns[0], Point(x, y), 0);
+		}
+
+		/*auto result = initialBoard.findClosestPointWithSameValue(x, y);
+		Console << result;*/
 		// If no solution found, call dynamicProgramming
-		solutions.push_back(dynamicProgramming(initialBoard, patterns, 0));
+		// solutions.push_back(dynamicProgramming(initialBoard, patterns, 0));
 		return solutions;
 	}
+
+	//Solution chokudaiSearch(const Board& initialBoard, const Array<Pattern>& patterns) {
+	//	static const int height = initialBoard.height;
+	//	static const int width = initialBoard.width;
+	//	Solution solution;
+	//	double bestDelta = 0;
+	//	OptimizedBoard board(width, height, initialBoard.grid, initialBoard.goal);
+	//	Grid<int> debug(width, height);
+	//	Console << U"before progress:{}"_fmt(board.getCorrectCount());
+	//	board.print();
+	//	auto progress = [](OptimizedBoard& a) {
+	//		int res = 0;
+	//		for (int i : step(a.height)) {
+	//			for (int j : step(a.width)) {
+	//				if (a.getGrid(j, i) != a.getGoal(j, i)) return res;
+	//				res++;
+	//			}
+	//		}
+	//		return res;
+	//		};
+
+	//	const auto& legalActions = optimizedNextState(board, patterns);
+
+	//	for (const auto& solutions : legalActions) {
+	//		OptimizedBoard nextBoard = board;
+	//		int32 stepSize = solutions.steps.size();
+	//		Solution nextSolution;
+	//		for (const auto& action : solutions.steps) {
+	//			const auto& [pattern, point, direction] = action;
+	//			Console << U"pattern{}, point{}, dir{}"_fmt(pattern.p, point, direction);
+	//			nextBoard.apply_pattern(pattern, point, direction);
+	//			nextSolution.steps.emplace_back(action);
+	//			// nextSolution.steps.emplace_back(action);
+	//		}
+	//		int32 prog = nextBoard.getCorrectCount();
+	//		Console << U"correctCont(), prog : " << Point(prog, progress(nextBoard));
+	//		double delta = double(prog - board.getCorrectCount()) / double(stepSize);
+	//		Console << U"delta:{}"_fmt(delta);
+
+
+	//		if (delta > bestDelta) {
+	//			bestDelta = delta;
+	//			solution = nextSolution;
+	//		}
+	//	}
+
+
+
+	//	return solution;
+	//}
+
 
 	Solution chokudaiSearch(const Board& initialBoard, const Array<Pattern>& patterns) {
 		static const int height = initialBoard.height;
 		static const int width = initialBoard.width;
+		int beamWidth = 1;
+		struct State {
+			OptimizedBoard board;
+			Solution solution;
+			double score;
+			int progress;
+			State(const OptimizedBoard& b, const Solution& s, double sc, int prog)
+				: board(b), solution(s), score(sc), progress(prog) {}
+		};
 
-		OptimizedBoard board(width, height, initialBoard.grid, initialBoard.goal);
+		auto calculateScore = [](const OptimizedBoard& board, int stepCount) {
+			int correctCount = board.getCorrectCount();
+			return static_cast<double>(correctCount) / (stepCount + 1);
+			};
 
+		auto compareStates = [](const State& a, const State& b) {
+			return a.score < b.score; // Higher score is better
+			};
 
+		std::priority_queue<State, std::vector<State>, decltype(compareStates)> beam(compareStates);
+		OptimizedBoard initialOptBoard(width, height, initialBoard.grid, initialBoard.goal);
+		beam.emplace(initialOptBoard, Solution(), calculateScore(initialOptBoard, 0), initialOptBoard.getCorrectCount());
 
+		State bestState = beam.top();
 
-		return Solution();
+		for (int depth = 0; depth < width * height; ++depth) {
+			std::priority_queue<State, std::vector<State>, decltype(compareStates)> nextBeam(compareStates);
+
+			while (!beam.empty() && nextBeam.size() < beamWidth) {
+				State currentState = beam.top();
+				beam.pop();
+
+				const auto& legalActions = optimizedNextState(currentState.board, patterns);
+
+				for (const auto& solutions : legalActions) {
+					OptimizedBoard nextBoard = currentState.board;
+					Solution nextSolution = currentState.solution;
+
+					for (const auto& action : solutions.steps) {
+						const auto& [pattern, point, direction] = action;
+						Console << U"pattern {} point {} direction {}"_fmt(pattern.p, point, direction);
+						nextBoard.apply_pattern(pattern, point, direction);
+						nextSolution.steps.emplace_back(action);
+					}
+
+					int newProgress = nextBoard.getCorrectCount();
+					double newScore = calculateScore(nextBoard, nextSolution.steps.size());
+
+					State newState(nextBoard, nextSolution, newScore, newProgress);
+					nextBeam.push(newState);
+
+					if (newState.score > bestState.score) {
+						bestState = newState;
+					}
+
+					if (nextBoard.isGoal()) {
+						Console << U"goaled";
+						return bestState.solution;
+					}
+				}
+			}
+
+			beam = nextBeam;
+		}
+
+		return bestState.solution;
 	}
 
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns, int32 beamWidth, int32 maxSteps) {
