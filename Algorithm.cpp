@@ -1088,6 +1088,7 @@ namespace Algorithm {
 					set(x, y, value);
 					--y;
 				}
+				std::reverse(removed_in_col.begin(), removed_in_col.end());
 				for (int value : removed_in_col) {
 					set(x, y, value);
 					--y;
@@ -1136,7 +1137,7 @@ namespace Algorithm {
 					set(x, y, value);
 					--x;
 				}
-				// std::reverse(removed_in_row.begin(), removed_in_row.end());
+				std::reverse(removed_in_row.begin(), removed_in_row.end());
 				for (int value : removed_in_row) {
 					set(x, y, value);
 					--x;
@@ -1184,9 +1185,8 @@ namespace Algorithm {
 			for (int i = 0; i < uint64Count; ++i) {
 				uint64_t diff = grid[i] ^ goal[i];
 				if (diff != 0) {
-					// Find the first mismatch
-					while (diff) {
-						if (diff & MASK) {
+					for (int j = 0; j < CELLS_PER_UINT64 && count < totalCells; ++j) {
+						if ((diff & MASK) != 0) {
 							return count;
 						}
 						diff >>= 2;
@@ -1195,10 +1195,14 @@ namespace Algorithm {
 				}
 				else {
 					count += CELLS_PER_UINT64;
+					if (count > totalCells) {
+						count = totalCells;
+						break;
+					}
 				}
 			}
 
-			return std::min(count, totalCells);
+			return count;
 		}
 		Point findClosestPointWithSameValue(int a, int b) const {
 			int targetValue = getGoal(a, b);
@@ -1206,13 +1210,14 @@ namespace Algorithm {
 			std::vector<std::pair<int, int>> candidates;
 
 			// Step 1 & 2: Find all points with the same value
-			for (int y = 0; y < height; ++y) {
-				for (int x = 0; x < width; ++x) {
+			for (int y = b; y < height; ++y) {
+				for (int x = a; x < width; ++x) {
 					if (getGrid(x, y) == targetValue) {
-						int index = calculateIndex(x, y);
-						if (index > targetIndex) {  // Step 4: Filter condition
-							candidates.emplace_back(x, y);
-						}
+						candidates.emplace_back(x, y);
+						//int index = calculateIndex(x, y);
+						//if (index > targetIndex) {  // Step 4: Filter condition
+						//	candidates.emplace_back(x, y);
+						//}
 					}
 				}
 			}
@@ -1225,8 +1230,14 @@ namespace Algorithm {
 			int minPopcountDiff = std::numeric_limits<int>::max();
 			// std::pair<int, int> closestPoint = { -1, -1 };
 			Point closestPoint = { -1, -1 };
-
-			int targetPopcount = popcount(targetIndex);
+			for (const auto& [x, y] : candidates) {
+				int popcountDiff = popcount(y - b);
+				if (popcountDiff < minPopcountDiff) {
+					minPopcountDiff = popcountDiff;
+					closestPoint = { x,y };
+				}
+			}
+			/*int targetPopcount = popcount(targetIndex);
 			for (const auto& [x, y] : candidates) {
 				int index = calculateIndex(x, y);
 				int popcountDiff = std::abs(popcount(index) - targetPopcount);
@@ -1235,31 +1246,32 @@ namespace Algorithm {
 					minPopcountDiff = popcountDiff;
 					closestPoint = { x, y };
 				}
-			}
+			}*/
 
 			return closestPoint;
 		}
-
+		// (x, y)
 		std::vector<std::pair<int, int>> findPointsWithSameValueAndYPopcountDiff1(int a, int b) const {
 			int targetValue = getGoal(a, b);
-			int targetIndex = calculateIndex(a, b);
-			int targetYPopcount = popcount(getYFromIndex(targetIndex));
+			// int targetIndex = calculateIndex(a, b);
+			// int targetYPopcount = popcount(getYFromIndex(targetIndex));
 			std::vector<std::pair<int, int>> result;
+			std::random_device rd;
+			std::mt19937 gen(rd());
+			std::uniform_real_distribution<> dis(0.0, 0.3);
+			const double breakProb = 0.7;
+			for (const int dy : {1, 2, 4, 8, 16, 32, 64}) {
+				int ny = b + dy;
+				if (ny >= height) break;
+				int cnt = 0;
+				for (int x : step(width)) {
+					if (getGrid(x, ny) == getGoal(a, b)) {
+						cnt++;
+						result.emplace_back(x, ny);
 
-			for (int y = 0; y < height; ++y) {
-				int yPopcount = popcount(y);
-				if (std::abs(yPopcount - targetYPopcount) != 1) {
-					continue;  // Skip if y-popcount difference is not 1
-				}
-
-				for (int x = 0; x < width; ++x) {
-					int currentIndex = calculateIndex(x, y);
-					if (currentIndex <= targetIndex) {
-						continue;  // Skip if not farther than (a,b)
-					}
-
-					if (getGrid(x, y) == targetValue) {
-						result.emplace_back(x, y);
+						if (dis(gen) * cnt > breakProb) {
+							break;
+						}
 					}
 				}
 			}
@@ -1268,7 +1280,7 @@ namespace Algorithm {
 		}
 
 		bool isGoal() {
-			for (int i = 0; i < width * height; i++) {
+			for (int i = 0; i < grid.size(); i++) {
 				if (grid[i] != goal[i])return false;
 			}
 			return true;
@@ -1284,8 +1296,6 @@ namespace Algorithm {
 		int correctCount = initialBoard.getCorrectCount();
 		int y = correctCount / width, x = correctCount % width;
 		// Console << U"start : " << Point(x, y);
-		// 1手で到達可能
-
 		const auto& candidates = initialBoard.findPointsWithSameValueAndYPopcountDiff1(x, y);
 		// Console << candidates;
 		for (const auto& candidate : candidates) {
@@ -1304,174 +1314,193 @@ namespace Algorithm {
 			solution.steps.emplace_back(pattern, Point(x, y), 0);
 			solutions.emplace_back(solution);
 		}
+		if (!solutions.empty()) return solutions;
+		//if (!solutions.empty()) return solutions;
+		//// 1手で到達可能
+		//for (const auto& dy : bitDy) {
+		//	Solution solution;
+		//	int ny = y + dy;
+		//	if (ny >= height) break;
+		//	if (initialBoard.getGrid(x, ny) != initialBoard.getGoal(x, y)) continue;
+		//	int bit = static_cast<int>(std::log2(dy));
+		//	const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+		//	int dir = (dy < 0) ? 1 : 0; // 0 for up, 1 for down
+		//	solution.steps.emplace_back(pattern, Point(x, y), dir);
+		//	if (!solution.steps.empty()) solutions.push_back(solution);
+		//}
+		//if (!solutions.empty()) return solutions;
 
-		for (const auto& dy : bitDy) {
-			Solution solution;
-			int ny = y + dy;
-			if (ny >= height) break;
-			if (initialBoard.getGrid(x, ny) != initialBoard.getGoal(x, y)) continue;
-			int bit = static_cast<int>(std::log2(dy));
-			const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-			int dir = (dy < 0) ? 1 : 0; // 0 for up, 1 for down
-			solution.steps.emplace_back(pattern, Point(x, y), dir);
-			if (!solution.steps.empty()) solutions.push_back(solution);
-		}
 
-		for (const auto& dx : bitDx) {
-			Solution solution;
-			int nx = x + dx;
-			if (nx >= width) break;
-			if (initialBoard.getGrid(nx, y) != initialBoard.getGoal(x, y)) continue;
-			int bit = static_cast<int>(std::log2(dx));
-			const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-			solution.steps.emplace_back(pattern, Point(x, y), 2); // 2 for left
-			if (!solution.steps.empty()) solutions.push_back(solution);
-		}
-		if (solutions.empty()) {
-			Solution solution;
-			const auto& [ny, nx] = initialBoard.findClosestPointWithSameValue(x, y);
-			Console << U"nx, ny:" << Point(nx, ny);
-			int dx = nx - x;
-			if (dx > 0) {
-				solution.steps.emplace_back(patterns[22], Point(dx - 256, y + 1), 2);
+
+
+
+		//for (const auto& dx : bitDx) {
+		//	Solution solution;
+		//	int nx = x + dx;
+		//	if (nx >= width) break;
+		//	if (initialBoard.getGrid(nx, y) != initialBoard.getGoal(x, y)) continue;
+		//	int bit = static_cast<int>(std::log2(dx));
+		//	const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+		//	solution.steps.emplace_back(pattern, Point(x, y), 2); // 2 for left
+		//	if (!solution.steps.empty()) solutions.push_back(solution);
+		//}
+		//if (!solutions.empty()) return solutions;
+
+		std::vector<int>targets;
+		int target = initialBoard.getGoal(x, y);
+		for (int32 nx = x + 1; nx < width; nx++) {
+			if (initialBoard.getGrid(nx, y) == target) {
+				targets.emplace_back(nx);
 			}
-			else if (dx < 0) {
-				solution.steps.emplace_back(patterns[22], Point(width + dx, y + 1), 3);
-			}
-			/*int bit = std::log2(static_cast<unsigned>(ny - y));
-			Console << U"bit:{}"_fmt(bit);*/
-
-			/*const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];*/
-			solution.steps.emplace_back(patterns[0], Point(x, y), 0);
 		}
 
-		/*auto result = initialBoard.findClosestPointWithSameValue(x, y);
-		Console << result;*/
-		// If no solution found, call dynamicProgramming
-		// solutions.push_back(dynamicProgramming(initialBoard, patterns, 0));
+		for (const auto& gx : targets) {
+			Solution solution;
+			for (int bit : step(8)) {
+				if (((gx - x) >> bit) & 1) {
+					const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+					solution.steps.emplace_back(pattern, Point(x, y), 2);
+				}
+			}
+			Console << U"size:" << solutions.size();
+			solutions.emplace_back(solution);
+		}
 		return solutions;
 	}
 
-	//Solution chokudaiSearch(const Board& initialBoard, const Array<Pattern>& patterns) {
-	//	static const int height = initialBoard.height;
-	//	static const int width = initialBoard.width;
-	//	Solution solution;
-	//	double bestDelta = 0;
-	//	OptimizedBoard board(width, height, initialBoard.grid, initialBoard.goal);
-	//	Grid<int> debug(width, height);
-	//	Console << U"before progress:{}"_fmt(board.getCorrectCount());
-	//	board.print();
-	//	auto progress = [](OptimizedBoard& a) {
-	//		int res = 0;
-	//		for (int i : step(a.height)) {
-	//			for (int j : step(a.width)) {
-	//				if (a.getGrid(j, i) != a.getGoal(j, i)) return res;
-	//				res++;
-	//			}
-	//		}
-	//		return res;
-	//		};
-
-	//	const auto& legalActions = optimizedNextState(board, patterns);
-
-	//	for (const auto& solutions : legalActions) {
-	//		OptimizedBoard nextBoard = board;
-	//		int32 stepSize = solutions.steps.size();
-	//		Solution nextSolution;
-	//		for (const auto& action : solutions.steps) {
-	//			const auto& [pattern, point, direction] = action;
-	//			Console << U"pattern{}, point{}, dir{}"_fmt(pattern.p, point, direction);
-	//			nextBoard.apply_pattern(pattern, point, direction);
-	//			nextSolution.steps.emplace_back(action);
-	//			// nextSolution.steps.emplace_back(action);
-	//		}
-	//		int32 prog = nextBoard.getCorrectCount();
-	//		Console << U"correctCont(), prog : " << Point(prog, progress(nextBoard));
-	//		double delta = double(prog - board.getCorrectCount()) / double(stepSize);
-	//		Console << U"delta:{}"_fmt(delta);
-
-
-	//		if (delta > bestDelta) {
-	//			bestDelta = delta;
-	//			solution = nextSolution;
-	//		}
-	//	}
-
-
-
-	//	return solution;
-	//}
-
-
 	Solution chokudaiSearch(const Board& initialBoard, const Array<Pattern>& patterns) {
-		static const int height = initialBoard.height;
-		static const int width = initialBoard.width;
-		int beamWidth = 1;
+		const int32 height = initialBoard.height;
+		const int32 width = initialBoard.width;
+		const int beamDepth = 1;
 		struct State {
 			OptimizedBoard board;
 			Solution solution;
 			double score;
-			int progress;
-			State(const OptimizedBoard& b, const Solution& s, double sc, int prog)
-				: board(b), solution(s), score(sc), progress(prog) {}
+			int32 progress;
+			State(const OptimizedBoard& b, const Solution& s, double sc, int32 prog) : board(b), solution(s), score(sc), progress(prog) {}
 		};
+		auto progress = [](const Board& a) {
+
+			int32 res = 0;
+			for (int32 y : step(a.height)) {
+				for (int32 x : step(a.width)) {
+					if (a.grid[y][x] != a.goal[y][x]) {
+						return res;
+					}
+					res++;
+				}
+			}
+			};
+		//const auto& solution = beamSearch(initialBoard, patterns, 10, 1024);
+		OptimizedBoard board(width, height, initialBoard.grid, initialBoard.goal);
 
 		auto calculateScore = [](const OptimizedBoard& board, int stepCount) {
 			int correctCount = board.getCorrectCount();
 			return static_cast<double>(correctCount) / (stepCount + 1);
 			};
 
+
 		auto compareStates = [](const State& a, const State& b) {
-			return a.score < b.score; // Higher score is better
+			// そろっている部分が多いときに使うと手数が削減される場合がある
+			/*if (a.score == b.score) {
+				return a.board.calculateDifference(a.board.grid) > b.board.calculateDifference(b.board.grid);
+			}*/
+			return a.score < b.score; // スコアが高い方が優先
+			// return a.score > b.score; // スコアが低い方が優先
 			};
 
-		std::priority_queue<State, std::vector<State>, decltype(compareStates)> beam(compareStates);
-		OptimizedBoard initialOptBoard(width, height, initialBoard.grid, initialBoard.goal);
-		beam.emplace(initialOptBoard, Solution(), calculateScore(initialOptBoard, 0), initialOptBoard.getCorrectCount());
 
-		State bestState = beam.top();
+		auto beamSearchLambda = [&calculateScore, &compareStates, &patterns](std::priority_queue<State, std::vector<State>, decltype(compareStates)>& beam,
+			OptimizedBoard& board) -> Solution {
+				int beamWidth = 3;
+				auto startTime = std::chrono::high_resolution_clock::now();
+				State bestState = beam.top();
+				for (int32 t : step(4)) {
+					Console << U"t:{}"_fmt(t);
+					std::priority_queue<State, std::vector<State>, decltype(compareStates)> nextBeam;
+					for (int32 w = 0; w < beamWidth; w++) {
+						if (beam.empty())break;
+						State currentState = beam.top();
+						Console << U"progress:" << currentState.progress << U"/{}steps"_fmt(currentState.solution.steps.size());
+						beam.pop();
+						// if (currentState.board.isGoal()) continue;
+						const auto& legalActions = optimizedNextState(currentState.board, patterns);
+						for (const auto& solutions : legalActions) {
+							OptimizedBoard nextBoard = currentState.board;
+							int32 stepSize = solutions.steps.size();
+							if (stepSize == 0) {
 
-		for (int depth = 0; depth < width * height; ++depth) {
-			std::priority_queue<State, std::vector<State>, decltype(compareStates)> nextBeam(compareStates);
+							}
+							Solution nextSolution;
+							for (const auto& action : solutions.steps) {
+								const auto& [pattern, point, direction] = action;
+								// Console << U"point{}, dir{}"_fmt(point, direction);
+								nextBoard.apply_pattern(pattern, point, direction);
+								nextSolution.steps.emplace_back(action);
+								currentState.solution.steps.emplace_back(action);
+							}
+							int32 prog = nextBoard.getCorrectCount();
+							double delta = prog - currentState.progress;
+							// double acc = 1 - double(nextBoard.calculateDifference(nextBoard.grid) / (height * width));
+							double newScore = delta / stepSize * prog / currentState.solution.steps.size();
+							// double newScore = delta / stepSize * acc;
+							// Console << U"score:" << newScore;
+							State newState = State(nextBoard, currentState.solution, newScore, prog);
 
-			while (!beam.empty() && nextBeam.size() < beamWidth) {
-				State currentState = beam.top();
-				beam.pop();
-
-				const auto& legalActions = optimizedNextState(currentState.board, patterns);
-
-				for (const auto& solutions : legalActions) {
-					OptimizedBoard nextBoard = currentState.board;
-					Solution nextSolution = currentState.solution;
-
-					for (const auto& action : solutions.steps) {
-						const auto& [pattern, point, direction] = action;
-						Console << U"pattern {} point {} direction {}"_fmt(pattern.p, point, direction);
-						nextBoard.apply_pattern(pattern, point, direction);
-						nextSolution.steps.emplace_back(action);
+							if (t == 0) {
+								newState.solution = nextSolution;
+							}
+							for (int32 _ : step(stepSize)) currentState.solution.steps.pop_back();
+							nextBeam.emplace(newState);
+							/*if (nextBoard.isGoal()) {
+								bestState = currentState;
+								break;
+							}*/
+						}
 					}
 
-					int newProgress = nextBoard.getCorrectCount();
-					double newScore = calculateScore(nextBoard, nextSolution.steps.size());
-
-					State newState(nextBoard, nextSolution, newScore, newProgress);
-					nextBeam.push(newState);
-
-					if (newState.score > bestState.score) {
-						bestState = newState;
+					beam = nextBeam;
+					if (beam.empty()) return bestState.solution;
+					bestState = beam.top();
+					if (board.width * board.height - bestState.board.getCorrectCount() < 500) {
+						beamWidth = Max(20, beamWidth + 1);
+					}
+					if (bestState.board.isGoal()) {
+						auto currentTime = std::chrono::high_resolution_clock::now();
+						double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+						Console << elapsedTime << U"sec";
+						break;
 					}
 
-					if (nextBoard.isGoal()) {
-						Console << U"goaled";
-						return bestState.solution;
-					}
 				}
+
+				return bestState.solution;
+			};
+
+
+
+
+
+
+
+		auto startTime = std::chrono::high_resolution_clock::now();
+		Solution solution;
+		while (!board.isGoal()) {
+			// if (beam.empty()) break;
+			std::priority_queue<State, std::vector<State>, decltype(compareStates)> beam(compareStates);
+			// beam.emplace(initialBoard, Solution(), initialBoard.calculateDifference(initialBoard.goal));
+			beam.emplace(State(board, Solution(), 0, board.getCorrectCount()));
+			State bestState = beam.top();
+			const auto& legalActions = beamSearchLambda(beam, board);
+			if (legalActions.steps.empty()) break;
+			for (const auto& action : legalActions.steps) {
+				const auto& [pattern, point, direction] = action;
+				board.apply_pattern(pattern, point, direction);
+				solution.steps.emplace_back(action);
 			}
-
-			beam = nextBeam;
+			if (board.isGoal()) break;
 		}
-
-		return bestState.solution;
+		return solution;
 	}
 
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns, int32 beamWidth, int32 maxSteps) {
