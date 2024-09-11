@@ -1477,12 +1477,6 @@ namespace Algorithm {
 				return bestState.solution;
 			};
 
-
-
-
-
-
-
 		auto startTime = std::chrono::high_resolution_clock::now();
 		Solution solution;
 		while (!board.isGoal()) {
@@ -1500,6 +1494,9 @@ namespace Algorithm {
 			}
 			if (board.isGoal()) break;
 		}
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+		Console << elapsedTime << U"sec";
 		return solution;
 	}
 
