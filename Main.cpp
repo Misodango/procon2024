@@ -322,7 +322,8 @@ void Main() {
 			if (KeyM.down()) {
 				readMouseInput ^= 1;
 			}
-			if (readMouseInput && Cursor::Pos().x < 1024 && Cursor::Pos().y < 1024) if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0) patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
+			if (readMouseInput && Cursor::Pos().x >= 0 &&  Cursor::Pos().x < 1024 && Cursor::Pos().y >= 0 && Cursor::Pos().y < 1024) if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0)
+				patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
 
 			else {
 				// 入力処理
@@ -441,7 +442,9 @@ void Main() {
 			patterns[currentPattern].p, patternPos.x, patternPos.y, U"↑↓←→"[direction],
 			currentMode == GameMode::Manual ? U"Manual" : algorithmNames[currentAlgorithm],
 			progress, nextProgress,
-			board.goal[patternPos.y][patternPos.x]))
+			patternPos.y >= 0 && patternPos.y < board.height &&
+			patternPos.x >= 0 && patternPos.x < board.width 
+			? board.goal[patternPos.y][patternPos.x]: -1))
 			.draw(1100, 300, headlineColor);
 
 		// ゴール状態のチェック
