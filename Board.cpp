@@ -364,7 +364,7 @@ Point Board::BFSbyPopcount(Point start, int32 target) const {
 	Point best = Point(-1, -1);
 
 	static Grid<int32> distances(width * height, width * height);
-	static Grid<Array<std::pair<int32, Point>>> sortedDistances(width, height); // (y, x) に近いものを順に入れたい
+	static Grid<Array<std::pair<int32, Point>>> sortedDistances(width, height); // (sy, sx) に近いものを順に入れたい
 
 	static bool initialized;
 	if (sortedDistances.width() != width || sortedDistances.height() != height) {
