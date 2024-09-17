@@ -8,7 +8,6 @@
 namespace Algorithm {
 
 	enum class Type {
-		TimeLimitiedGreedy,
 		Greedy,
 		BeamSearch,
 		DynamicProgramming,
@@ -63,7 +62,6 @@ namespace Algorithm {
 		}
 	};
 
-	Solution timeLimitedGreedy(const Board& initialBoard, const Array<Pattern>& patterns, int32 time = -1);
 	Solution greedy(const Board& initialBoard, const Array<Pattern>& patterns);
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns, int32 beamWidth, int32 maxSteps = 1000);
 	Solution dynamicProgramming(const Board& initialBoard, const Array<Pattern>& patterns, double timeLimit);
