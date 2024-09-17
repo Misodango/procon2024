@@ -435,149 +435,6 @@ namespace Algorithm {
 		return timeLimitedGreedy(initialBoard, patterns, -1); // -1 -> no limit
 	}
 
-
-	/**
-	* @brief 二次元セグメント木
-	* @docs docs/data-structure-2d/2d-segment-tree.md
-	*/
-	/*
-	class SegmentTree2D
-	{
-	private:
-		int32 id(int32 h, int32 w) const { return h * 2 * W + w; }
-
-	public:
-		int32 H, W;
-		Array<int32> seg;
-		std::function<int32(int32, int32)> f;
-		int32 I;
-
-		SegmentTree2D(int32 h, int32 w, std::function<int32(int32, int32)> _f, const int32& i)
-			: f(_f), I(i)
-		{
-			init(h, w);
-		}
-
-		void init(int32 h, int32 w)
-		{
-			H = W = 1;
-			while (H < h) H <<= 1;
-			while (W < w) W <<= 1;
-			seg.resize(4 * H * W, I);
-		}
-
-		void set(int32 h, int32 w, const int32& x) { seg[id(h + H, w + W)] = x; }
-
-		void build()
-		{
-			for (int32 w = W; w < 2 * W; w++)
-			{
-				for (int32 h = H - 1; h; h--)
-				{
-					seg[id(h, w)] = f(seg[id(2 * h + 0, w)], seg[id(2 * h + 1, w)]);
-				}
-			}
-			for (int32 h = 0; h < 2 * H; h++)
-			{
-				for (int32 w = W - 1; w; w--)
-				{
-					seg[id(h, w)] = f(seg[id(h, 2 * w + 0)], seg[id(h, 2 * w + 1)]);
-				}
-			}
-		}
-
-		int32 get(int32 h, int32 w) const { return seg[id(h + H, w + W)]; }
-		int32 operator()(int32 h, int32 w) const { return seg[id(h + H, w + W)]; }
-
-		void update(int32 h, int32 w, const int32& x)
-		{
-			h += H, w += W;
-			seg[id(h, w)] = x;
-			for (int32 i = h >> 1; i; i >>= 1)
-			{
-				seg[id(i, w)] = f(seg[id(2 * i + 0, w)], seg[id(2 * i + 1, w)]);
-			}
-			for (; h; h >>= 1)
-			{
-				for (int32 j = w >> 1; j; j >>= 1)
-				{
-					seg[id(h, j)] = f(seg[id(h, 2 * j + 0)], seg[id(h, 2 * j + 1)]);
-				}
-			}
-		}
-
-		int32 _inner_query(int h, int w1, int w2)
-		{
-			int32 res = I;
-			for (; w1 < w2; w1 >>= 1, w2 >>= 1)
-			{
-				if (w1 & 1) res = f(res, seg[id(h, w1)]), w1++;
-				if (w2 & 1) --w2, res = f(res, seg[id(h, w2)]);
-			}
-			return res;
-		}
-
-		int32 query(int h1, int w1, int h2, int w2)
-		{
-			if (h1 >= h2 || w1 >= w2) return I;
-			int32 res = I;
-			h1 += H, h2 += H, w1 += W, w2 += W;
-			for (; h1 < h2; h1 >>= 1, h2 >>= 1)
-			{
-				if (h1 & 1) res = f(res, _inner_query(h1, w1, w2)), h1++;
-				if (h2 & 1) --h2, res = f(res, _inner_query(h2, w1, w2));
-			}
-			return res;
-		}
-	};
-	class CountSegmentTree2D
-	{
-	private:
-		Array<SegmentTree2D> trees;
-
-	public:
-		CountSegmentTree2D(int32 h, int32 w)
-			: trees(4)
-		{
-			auto f = [](int32 a, int32 b) { return a + b; };
-			const int32 identity = 0;
-
-			for (auto& tree : trees)
-			{
-				tree = SegmentTree2D(h, w, f, identity);
-			}
-		}
-
-		void set(int32 h, int32 w, int32 value)
-		{
-			assert(0 <= value && value < 4);
-			for (int32 i = 0; i < 4; ++i)
-			{
-				trees[i].set(h, w, (i == value) ? 1 : 0);
-			}
-		}
-
-		void build()
-		{
-			for (auto& tree : trees)
-			{
-				tree.build();
-			}
-		}
-
-		Array<int32> query(int32 h1, int32 w1, int32 h2, int32 w2)
-		{
-			Array<int32> result(4);
-			for (int32 i = 0; i < 4; ++i)
-			{
-				result[i] = trees[i].query(h1, w1, h2, w2);
-			}
-			return result;
-		}
-	};
-	*/
-
-
 	class SegmentTree {
 	private:
 		std::vector<std::pair<int, std::pair<int32, int32>>> tree;
@@ -629,38 +486,36 @@ namespace Algorithm {
 					Console << U"sx, sy: " << Point(x, y);
 					Console << U"dx dy:" << Point(dx, dy);
 					if (dy == 0 && dx == 0) continue;
-					// dy を愚直に処理するとき
-					for (int32 bit = 0; bit <= 8; bit++) {
-						if ((abs(dy) >> bit) & 1) {
-							auto pattern = patterns[0];
-							if (bit == 0) {
-								pattern = patterns[0];
-							}
-							else {
-								// idx: 3*(bit-1)+1
-								pattern = patterns[3 * (bit - 1) + 1];
-							}
 
-							int32 dir = dy < 0; // dy > 0 => 上移動
-							board.apply_pattern(pattern, Point(x + dx, y), dir);
-							solution.steps.push_back(std::make_tuple(pattern, Point(x + dx, y), dir));
+					if (dx != 0) {
+						if (dy > 0) {
+							board.apply_pattern(patterns[22], Point(nearestPoint.x, dy - 256), 0);
+							solution.steps.emplace_back(patterns[22], Point(nearestPoint.x, dy - 256), 0);
+						}
+						else if (dy < 0) {
+							board.apply_pattern(patterns[22], Point(nearestPoint.x, dy + board.height), 1);
+							solution.steps.emplace_back(patterns[22], Point(nearestPoint.x, dy + board.height), 1);
+						}
+					}
+					else {
+						for (int32 bit = 0; bit <= 8; bit++) {
+							if ((abs(dy) >> bit) & 1) {
+								auto pattern = patterns[0];
+								if (bit == 0) {
+									pattern = patterns[0];
+								}
+								else {
+									// idx: 3*(bit-1)+1
+									pattern = patterns[3 * (bit - 1) + 1];
+								}
+
+								int32 dir = dy < 0; // dy > 0 => 上移動
+								board.apply_pattern(pattern, Point(x + dx, y), dir);
+								solution.steps.emplace_back(pattern, Point(x + dx, y), dir);
+							}
 						}
 					}
 
-					// マイナス座標も許容することで1手で処理できる y == 0二のみ有効
-					// 未完成
-					/*
-					if (dy > 0) {
-						auto pattern = patterns[24];
-						board.apply_pattern(pattern, Point(x + dx, y - dy - 256), 0);
-						solution.steps.push_back(std::make_tuple(pattern, Point(x + dx, y - dy - 256), 0));
-					}
-					else if (dy < 0) {
-						auto pattern = patterns[24];
-						board.apply_pattern(pattern, Point(x + dx, y + dy + 1), 1);
-						solution.steps.push_back(std::make_tuple(pattern, Point(x + dx, y + dy + 1), 1));
-					}
-					*/
 					for (int32 bit = 0; bit <= 8; bit++) {
 						if ((dx >> bit) & 1) {
 							auto pattern = patterns[0];
@@ -1283,28 +1138,28 @@ namespace Algorithm {
 					}
 					solutions.emplace_back(solution);
 				}
-				if(solutions.empty())
-				for (const int& dx : { 0,1,2,4,8,16,32,64,128 }) {
-					int nx = dx + sx;
-					for (const int& dy : { 0,1,2,4,8,16,32,64,128 }) {
-						int ny = dy + sy;
-						if (target != board.getGrid(nx, ny))continue;
-						Solution solution;
-						for (int bit : step(8)) {
-							if (((nx - sx) >> bit) & 1) {
-								solution.steps.emplace_back(patterns[patternIndex(bit)],
-									Point(sx, ny), 2);
+				if (solutions.empty())
+					for (const int& dx : { 0,1,2,4,8,16,32,64,128 }) {
+						int nx = dx + sx;
+						for (const int& dy : { 0,1,2,4,8,16,32,64,128 }) {
+							int ny = dy + sy;
+							if (target != board.getGrid(nx, ny))continue;
+							Solution solution;
+							for (int bit : step(8)) {
+								if (((nx - sx) >> bit) & 1) {
+									solution.steps.emplace_back(patterns[patternIndex(bit)],
+										Point(sx, ny), 2);
+								}
 							}
-						}
-						for (int bit : step(8)) {
-							if (((ny - sy) >> bit) & 1) {
-								solution.steps.emplace_back(patterns[patternIndex(bit)],
-									Point(sx, sy), 0);
+							for (int bit : step(8)) {
+								if (((ny - sy) >> bit) & 1) {
+									solution.steps.emplace_back(patterns[patternIndex(bit)],
+										Point(sx, sy), 0);
+								}
 							}
+							solutions.emplace_back(solution);
 						}
-						solutions.emplace_back(solution);
 					}
-				}
 				return solutions;
 			}
 
