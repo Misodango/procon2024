@@ -358,6 +358,7 @@ namespace Algorithm {
 		// Z字に進行(横書き文章の順)
 		// 3HWで解く
 		// 1番右の列を移動につかうことで3HWで解ける
+		auto startTime = std::chrono::high_resolution_clock::now();
 		Solution solution;
 		while (!board.isGoal()) {
 
@@ -370,7 +371,7 @@ namespace Algorithm {
 
 			for (const auto& [nx, ny] : candidates) {
 				OptimizedBoard currentBoard = board;
-				Console << U"nx, ny : " << Point(nx, ny);
+				// Console << U"nx, ny : " << Point(nx, ny);
 				Solution currentSolution;
 				const int32 dy = ny - sy, dx = nx - sx;
 				if (dx > 0) {
@@ -388,7 +389,7 @@ namespace Algorithm {
 					currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
 				}
 				if (currentSolution.steps.size() == 0) {
-					Console << U"step size 0 " << Point(nx, ny);
+					// Console << U"step size 0 " << Point(nx, ny);
 					continue;
 				}
 				double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
@@ -400,6 +401,7 @@ namespace Algorithm {
 
 			if (bestSolution.steps.empty()) {
 				int32 target = board.getGoal(sx, sy);
+				progress = board.getCorrectCount();
 				/*for (int32 ny = sy; ny < board.height; ny++) {
 					for (int32 nx = sx; nx < board.width; nx++) {*/
 				for (int32 i = progress; i < board.height * board.width; i++) {
@@ -408,7 +410,7 @@ namespace Algorithm {
 					OptimizedBoard currentBoard = board;
 					Solution currentSolution;
 					uint32 dy = ny - sy, dx = nx - sx;
-
+					// Console << U"nx, ny:" << Point(nx, ny);
 					// １行でも(nx, ny)と(sx, sy)に空き行があれば１手で横移動できる
 					if (dy > 1) {
 						if (dx > 0) {
@@ -421,29 +423,34 @@ namespace Algorithm {
 						}
 					}
 					else {
+						
 						for (int bit : step(8)) {
-							if (((dx >> bit) & 1) == 0) continue;
-							const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
-							currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
-							currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
+							if ((dx >> bit) & 1) {
+								const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+								currentBoard.apply_pattern(pattern, Point(sx, sy), 2);
+								currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
+							}
 						}
 					}
 
-					for (int bit : step(8)) {
-						if (((dy >> bit) & 1) == 0) continue;
-						const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
-						currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
-						currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+					if (dy > 0)for (int bit : step(8)) {
+						if ((dy >> bit) & 1) {
+							const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+							currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
+							currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+						}
 					}
 
 					if (currentSolution.steps.size() == 0) {
-						Console << U"step size 0(y popcount not 0) " << Point(nx, ny);
+						// Console << U"step size 0(y popcount not 0) " << Point(nx, ny);
 						continue;
 					}
-					double currentProgressDelta = (currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
+					double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
+					// Console << U"progress delta:" << currentProgressDelta;
 					if (currentProgressDelta > bestProgressDelta) {
 						bestProgressDelta = currentProgressDelta;
 						bestSolution = currentSolution;
+						
 					}
 				}
 			}
@@ -456,8 +463,10 @@ namespace Algorithm {
 				Console << U"pattern:{}, Point:{}, direction:{}"_fmt(pattern.p, point, direction);
 			}
 
-			// return solution;
 		}
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+		Console << elapsedTime << U"sec";
 		return solution;
 	}
 

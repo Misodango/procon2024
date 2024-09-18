@@ -109,7 +109,8 @@ void Board::draw() const {
 			// Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ? colors[grid[y][x]] : wrongTileColor));
 			Rect(x * cellSize, y * cellSize, cellSize).draw(colors[grid[y][x]]);
 			// FontAsset(U"Cell")(grid[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
-			if (goal[y][x] != grid[y][x]) font(goal[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
+			if (Max(height, width) < 128)
+				if (goal[y][x] != grid[y][x]) font(goal[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
 
 
 			// グリッドの線を描画
