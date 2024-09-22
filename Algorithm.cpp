@@ -8,6 +8,7 @@ namespace Algorithm {
 	private:
 		std::vector<uint64_t> grid;
 		std::vector<uint64_t> goal;
+		std::vector<uint64_t> temp_grid;
 		static constexpr int CELLS_PER_UINT64 = 32;
 		static constexpr uint64_t MASK = 0x3; // 11 in binary
 
@@ -22,11 +23,76 @@ namespace Algorithm {
 			// return __builtin_popcount(n);
 		}
 
-
 		int getYFromIndex(int index) const {
 			return index / width;
 		}
 
+		int estimateStepEffectFast(const Pattern& pattern, Point pos, int direction, int& lastCorrectX, int& lastCorrectY) const {
+			int effect = 0;
+
+			// パターンの適用位置が最後の正解位置より前なら、効果はほぼないと考える
+			if (pos.y < lastCorrectY || (pos.y == lastCorrectY && pos.x < lastCorrectX)) {
+				return 0;
+			}
+
+			// パターンのサイズに基づいて、影響を受ける可能性のある正解セルの数を推定
+			int affectedCells = pattern.grid.width() * pattern.grid.height();
+
+			switch (direction) {
+			case 0: // up
+				effect = estimateVerticalShiftEffect(pos, -affectedCells, lastCorrectY);
+				break;
+			case 1: // down
+				effect = estimateVerticalShiftEffect(pos, affectedCells, lastCorrectY);
+				break;
+			case 2: // left
+				effect = estimateHorizontalShiftEffect(pos, -affectedCells, lastCorrectX, lastCorrectY);
+				break;
+			case 3: // right
+				effect = estimateHorizontalShiftEffect(pos, affectedCells, lastCorrectX, lastCorrectY);
+				break;
+			}
+
+			// 最後の正解位置を更新
+			lastCorrectY += effect / width;
+			lastCorrectX = (lastCorrectX + effect) % width;
+
+			return effect;
+		}
+
+		int estimateVerticalShiftEffect(Point pos, int shift, int lastCorrectY) const {
+			int effect = 0;
+			int startY = std::max(lastCorrectY, pos.y);
+			int endY = std::min(height - 1, pos.y + abs(shift));
+
+			for (int y = startY; y <= endY; ++y) {
+				if (getGrid(pos.x, y) == getGoal(pos.x, y + shift)) {
+					effect++;
+				}
+				else if (getGrid(pos.x, y) == getGoal(pos.x, y)) {
+					effect--;
+				}
+			}
+
+			return effect;
+		}
+
+		int estimateHorizontalShiftEffect(Point pos, int shift, int lastCorrectX, int lastCorrectY) const {
+			int effect = 0;
+			int startX = (pos.y == lastCorrectY) ? std::max(lastCorrectX, pos.x) : pos.x;
+			int endX = std::min(width - 1, pos.x + abs(shift));
+
+			for (int x = startX; x <= endX; ++x) {
+				if (getGrid(x, pos.y) == getGoal(x + shift, pos.y)) {
+					effect++;
+				}
+				else if (getGrid(x, pos.y) == getGoal(x, pos.y)) {
+					effect--;
+				}
+			}
+
+			return effect;
+		}
 
 	public:
 		int width, height;
@@ -41,6 +107,7 @@ namespace Algorithm {
 			int uint64Count = (cellCount + CELLS_PER_UINT64 - 1) / CELLS_PER_UINT64;
 			grid.resize(uint64Count, 0);
 			goal.resize(uint64Count, 0);
+			temp_grid.resize(uint64Count, 0);
 			setGrid(gr);
 			setGoal(go);
 		}
@@ -110,113 +177,127 @@ namespace Algorithm {
 			}
 		}
 
-		void shift_up(const Grid<bool>& isRemoved) {
+
+		void shift_up(const std::vector<bool>& isRemoved) {
+			std::fill(temp_grid.begin(), temp_grid.end(), 0);
 			for (int x = 0; x < width; ++x) {
-				std::vector<int> column;
-				std::vector<int> removed_in_col;
+				int writeY = 0;
 				for (int y = 0; y < height; ++y) {
-					if (!isRemoved[y][x]) {
-						column.push_back(getGrid(x, y));
-					}
-					else {
-						removed_in_col.push_back(getGrid(x, y));
+					if (!isRemoved[y * width + x]) {
+						int value = getGrid(x, y);
+						int writeIndex = writeY * width + x;
+						int writeArrayIndex = writeIndex / CELLS_PER_UINT64;
+						int writeBitIndex = (writeIndex % CELLS_PER_UINT64) * 2;
+						temp_grid[writeArrayIndex] |= static_cast<uint64_t>(value) << writeBitIndex;
+						++writeY;
 					}
 				}
-				int y = 0;
-				for (int value : column) {
-					set(x, y, value);
-					++y;
-				}
-				for (int value : removed_in_col) {
-					set(x, y, value);
-					++y;
+				for (int y = 0; y < height; ++y) {
+					if (isRemoved[y * width + x]) {
+						int value = getGrid(x, y);
+						int writeIndex = writeY * width + x;
+						int writeArrayIndex = writeIndex / CELLS_PER_UINT64;
+						int writeBitIndex = (writeIndex % CELLS_PER_UINT64) * 2;
+						temp_grid[writeArrayIndex] |= static_cast<uint64_t>(value) << writeBitIndex;
+						++writeY;
+					}
 				}
 			}
+			std::swap(grid, temp_grid);
 		}
 
-		void shift_down(const Grid<bool>& isRemoved) {
+		void shift_down(const std::vector<bool>& isRemoved) {
+			std::fill(temp_grid.begin(), temp_grid.end(), 0);
 			for (int x = 0; x < width; ++x) {
-				std::vector<int> column;
-				std::vector<int> removed_in_col;
+				int writeY = height - 1;
 				for (int y = height - 1; y >= 0; --y) {
-					if (!isRemoved[y][x]) {
-						column.push_back(getGrid(x, y));
-					}
-					else {
-						removed_in_col.insert(removed_in_col.begin(), getGrid(x, y));
+					if (!isRemoved[y * width + x]) {
+						int value = getGrid(x, y);
+						int writeIndex = writeY * width + x;
+						int writeArrayIndex = writeIndex / CELLS_PER_UINT64;
+						int writeBitIndex = (writeIndex % CELLS_PER_UINT64) * 2;
+						temp_grid[writeArrayIndex] |= static_cast<uint64_t>(value) << writeBitIndex;
+						--writeY;
 					}
 				}
-				int y = height - 1;
-				for (int value : column) {
-					set(x, y, value);
-					--y;
-				}
-				std::reverse(removed_in_col.begin(), removed_in_col.end());
-				for (int value : removed_in_col) {
-					set(x, y, value);
-					--y;
+				for (int y = height - 1; y >= 0; --y) {
+					if (isRemoved[y * width + x]) {
+						int value = getGrid(x, y);
+						int writeIndex = writeY * width + x;
+						int writeArrayIndex = writeIndex / CELLS_PER_UINT64;
+						int writeBitIndex = (writeIndex % CELLS_PER_UINT64) * 2;
+						temp_grid[writeArrayIndex] |= static_cast<uint64_t>(value) << writeBitIndex;
+						--writeY;
+					}
 				}
 			}
+			std::swap(grid, temp_grid);
 		}
 
-		void shift_left(const Grid<bool>& isRemoved) {
+		void shift_left(const std::vector<bool>& isRemoved) {
+			std::fill(temp_grid.begin(), temp_grid.end(), 0);
 			for (int y = 0; y < height; ++y) {
-				std::vector<int> row;
-				std::vector<int> removed_in_row;
+				int writeX = 0;
 				for (int x = 0; x < width; ++x) {
-					if (!isRemoved[y][x]) {
-						row.push_back(getGrid(x, y));
-					}
-					else {
-						removed_in_row.push_back(getGrid(x, y));
+					if (!isRemoved[y * width + x]) {
+						int value = getGrid(x, y);
+						int writeIndex = y * width + writeX;
+						int writeArrayIndex = writeIndex / CELLS_PER_UINT64;
+						int writeBitIndex = (writeIndex % CELLS_PER_UINT64) * 2;
+						temp_grid[writeArrayIndex] |= static_cast<uint64_t>(value) << writeBitIndex;
+						++writeX;
 					}
 				}
-				int x = 0;
-				for (int value : row) {
-					set(x, y, value);
-					++x;
-				}
-				for (int value : removed_in_row) {
-					set(x, y, value);
-					++x;
+				for (int x = 0; x < width; ++x) {
+					if (isRemoved[y * width + x]) {
+						int value = getGrid(x, y);
+						int writeIndex = y * width + writeX;
+						int writeArrayIndex = writeIndex / CELLS_PER_UINT64;
+						int writeBitIndex = (writeIndex % CELLS_PER_UINT64) * 2;
+						temp_grid[writeArrayIndex] |= static_cast<uint64_t>(value) << writeBitIndex;
+						++writeX;
+					}
 				}
 			}
+			std::swap(grid, temp_grid);
 		}
 
-		void shift_right(const Grid<bool>& isRemoved) {
+		void shift_right(const std::vector<bool>& isRemoved) {
+			std::fill(temp_grid.begin(), temp_grid.end(), 0);
 			for (int y = 0; y < height; ++y) {
-				std::vector<int> row;
-				std::vector<int> removed_in_row;
+				int writeX = width - 1;
 				for (int x = width - 1; x >= 0; --x) {
-					if (!isRemoved[y][x]) {
-						row.push_back(getGrid(x, y));
-					}
-					else {
-						removed_in_row.insert(removed_in_row.begin(), getGrid(x, y));
+					if (!isRemoved[y * width + x]) {
+						int value = getGrid(x, y);
+						int writeIndex = y * width + writeX;
+						int writeArrayIndex = writeIndex / CELLS_PER_UINT64;
+						int writeBitIndex = (writeIndex % CELLS_PER_UINT64) * 2;
+						temp_grid[writeArrayIndex] |= static_cast<uint64_t>(value) << writeBitIndex;
+						--writeX;
 					}
 				}
-				int x = width - 1;
-				for (int value : row) {
-					set(x, y, value);
-					--x;
-				}
-				std::reverse(removed_in_row.begin(), removed_in_row.end());
-				for (int value : removed_in_row) {
-					set(x, y, value);
-					--x;
+				for (int x = width - 1; x >= 0; --x) {
+					if (isRemoved[y * width + x]) {
+						int value = getGrid(x, y);
+						int writeIndex = y * width + writeX;
+						int writeArrayIndex = writeIndex / CELLS_PER_UINT64;
+						int writeBitIndex = (writeIndex % CELLS_PER_UINT64) * 2;
+						temp_grid[writeArrayIndex] |= static_cast<uint64_t>(value) << writeBitIndex;
+						--writeX;
+					}
 				}
 			}
+			std::swap(grid, temp_grid);
 		}
-
 
 		void apply_pattern(const Pattern& pattern, Point pos, int direction) {
-			Grid<bool> isRemoved(width, height, false);
+			std::vector<bool> isRemovedVector(width * height, 0);
 			for (int y = 0; y < pattern.grid.height(); ++y) {
 				for (int x = 0; x < pattern.grid.width(); ++x) {
 					if (pattern.grid[y][x] == 1) {
 						int bx = pos.x + x, by = pos.y + y;
 						if (0 <= bx && bx < width && 0 <= by && by < height) {
-							isRemoved[by][bx] = true;
+							isRemovedVector[by * width + bx] = 1;
 						}
 					}
 				}
@@ -224,16 +305,16 @@ namespace Algorithm {
 
 			switch (direction) {
 			case 0: // up
-				shift_up(isRemoved);
+				shift_up(isRemovedVector);
 				break;
 			case 1: // down
-				shift_down(isRemoved);
+				shift_down(isRemovedVector);
 				break;
 			case 2: // left
-				shift_left(isRemoved);
+				shift_left(isRemovedVector);
 				break;
 			case 3: // right
-				shift_right(isRemoved);
+				shift_right(isRemovedVector);
 				break;
 			}
 
@@ -325,24 +406,72 @@ namespace Algorithm {
 			std::mt19937 gen(rd());
 			std::uniform_real_distribution<> dis(0.0, 0.3);
 			const double breakProb = 0.7;
+
 			for (const int dy : {1, 2, 4, 8, 16, 32, 64}) {
+				//for (const int dy : {64, 32, 16, 8, 4, 2, 1}) {
 				int ny = b + dy;
-				if (ny >= height) break;
+				if (ny >= height) continue;
 				int cnt = 0;
 				for (int x : step(width)) {
 					if (getGrid(x, ny) == getGoal(a, b)) {
-						cnt++;
-						result.emplace_back(x, ny);
-
-						if (dis(gen) * cnt > breakProb) {
-							break;
+						if (a == width - 1 || getGrid((x + 1) % width, ny) == getGoal(a + 1, b)) {
+							cnt++;
+							result.emplace_back(x, ny);
 						}
 					}
 				}
 			}
 
+			/*int siz = result.size();
+			if (width > 128) result.resize(siz / 3);*/
 			return result;
 		}
+
+		std::vector<std::pair<int, int>> sortedFindPointsWithSameValueAndYPopcountDiff1(int a, int b) const {
+			int targetValue = getGoal(a, b);
+			std::vector<std::tuple<int, int, float>> result; // (x, y, count)
+
+			auto calculateCount = [&](int sx, int sy, int nx, int ny) {
+				for (int i = sx; i < width; i++) {
+					if (getGoal(i, sy) != getGrid((nx + i - sx) % width, ny)) return i - sx;
+				}
+				return width - sx;
+				};
+
+			for (const int dy : {1, 2, 4, 8, 16, 32, 64}) {
+				int ny = b + dy;
+				if (ny >= height) continue;
+				for (int x : step(width)) {
+					if (getGrid(x, ny) == targetValue) {
+						int count = calculateCount(a, b, x, ny);
+						int stepSize = x == a ? 1 : 2;
+						result.emplace_back(x, ny, count / stepSize);
+					}
+				}
+			}
+
+			// Sort result based on count in descending order
+			std::sort(result.begin(), result.end(),
+					  [](const auto& a, const auto& b) { return std::get<2>(a) > std::get<2>(b); });
+
+			// Convert sorted result to vector of pairs (x, y)
+			std::vector<std::pair<int, int>> sortedResult;
+			sortedResult.reserve(result.size());
+			float maxCount = 0;
+			for (const auto& [x, y, count] : result) {
+				maxCount = Max(maxCount, count);
+				if (count < maxCount) break;
+				sortedResult.emplace_back(x, y);
+			}
+
+			// Optionally, limit the number of results
+			// if (sortedResult.size() > someLimit) {
+			//     sortedResult.resize(someLimit);
+			// }
+
+			return sortedResult;
+		}
+
 
 		bool isGoal()const {
 			// Console << getCorrectCountAll();
@@ -351,13 +480,67 @@ namespace Algorithm {
 			}
 			return true;
 		}
+
+		int evaluateSolutionFast(const Solution& solution) const {
+			int currentCorrectCount = getCorrectCount();
+			int lastCorrectY = currentCorrectCount / width;
+			int lastCorrectX = currentCorrectCount % width;
+
+			for (const auto& [pattern, pos, direction] : solution.steps) {
+				currentCorrectCount += estimateStepEffectFast(pattern, pos, direction, lastCorrectX, lastCorrectY);
+			}
+
+			return currentCorrectCount;
+		}
+
+		int calculateRowMatchScore(int goalY, int gridY, int startX) const {
+			int score = 0;
+			for (int x = startX; x < width; ++x) {
+				if (getGoal(x, goalY) == getGrid(x, gridY)) {
+					score++;
+				}
+				else {
+					break;  // Stop at the first mismatch
+				}
+			}
+			return score;
+		}
+
+		std::vector<std::pair<int, int>> findPromissingCandidates(int a, int b) const {
+			int targetValue = getGoal(a, b);
+			std::vector<std::pair<int, int>> candidates;
+			std::vector<std::tuple<int, int, double>> scoredCandidates;
+
+			// Search for candidates
+			for (int y = b; y < height; ++y) {
+				for (int x = 0; x < width; ++x) {
+					if (getGrid(x, y) == targetValue) {
+						int matchScore = calculateRowMatchScore(b, y, a);
+						double score = static_cast<double>(matchScore) / (y - b + 1);  // Normalize by distance
+						scoredCandidates.emplace_back(x, y, score);
+					}
+				}
+			}
+
+			// Sort candidates by score in descending order
+			std::sort(scoredCandidates.begin(), scoredCandidates.end(),
+					  [](const auto& a, const auto& b) { return std::get<2>(a) > std::get<2>(b); });
+
+			// Select top N candidates
+			const int N = 10;  // Adjust this value based on your needs
+			for (int i = 0; i < std::min(N, static_cast<int>(scoredCandidates.size())); ++i) {
+				candidates.emplace_back(std::get<0>(scoredCandidates[i]), std::get<1>(scoredCandidates[i]));
+			}
+
+			return candidates;
+		}
 	};
 
 	Solution greedy(const Board& initialBoard, const Array<Pattern>& patterns) {
 		OptimizedBoard board(initialBoard.width, initialBoard.height, initialBoard.grid, initialBoard.goal);
 		// Z字に進行(横書き文章の順)
 		// 3HWで解く
-		// 1番右の列を移動につかうことで3HWで解ける
+		// 1番右の列を移動につかうことで3HWで解ける?
 		auto startTime = std::chrono::high_resolution_clock::now();
 		Solution solution;
 		while (!board.isGoal()) {
@@ -365,7 +548,8 @@ namespace Algorithm {
 			int32 progress = board.getCorrectCount();
 			int32 sy = progress / board.width, sx = progress % board.width;
 			Console << U"sx , sy:" << Point(sx, sy);
-			const auto& candidates = board.findPointsWithSameValueAndYPopcountDiff1(sx, sy);
+			const auto& candidates = board.sortedFindPointsWithSameValueAndYPopcountDiff1(sx, sy);
+			// const auto& candidates = board.findPointsWithSameValueAndYPopcountDiff1(sx, sy);
 			Solution bestSolution;
 			double bestProgressDelta = 0;
 
@@ -392,7 +576,11 @@ namespace Algorithm {
 					// Console << U"step size 0 " << Point(nx, ny);
 					continue;
 				}
+				//int estimatedNewCorrectCount = board.evaluateSolutionFast(currentSolution);
+				//double currentProgressDeltaTest = double(estimatedNewCorrectCount - progress) / currentSolution.steps.size();
 				double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
+				/*Console << U"currentProgressDelta{}, evaluation{}"_fmt(currentBoard.getCorrectCount(),
+					estimatedNewCorrectCount);*/
 				if (currentProgressDelta > bestProgressDelta) {
 					bestProgressDelta = currentProgressDelta;
 					bestSolution = currentSolution;
@@ -423,7 +611,7 @@ namespace Algorithm {
 						}
 					}
 					else {
-						
+
 						for (int bit : step(8)) {
 							if ((dx >> bit) & 1) {
 								const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
@@ -450,23 +638,41 @@ namespace Algorithm {
 					if (currentProgressDelta > bestProgressDelta) {
 						bestProgressDelta = currentProgressDelta;
 						bestSolution = currentSolution;
-						
+
 					}
 				}
 			}
-
 
 			for (const auto& action : bestSolution.steps) {
 				const auto& [pattern, point, direction] = action;
 				board.apply_pattern(pattern, point, direction);
 				solution.steps.emplace_back(action);
-				Console << U"pattern:{}, Point:{}, direction:{}"_fmt(pattern.p, point, direction);
+				// Console << U"pattern:{}, Point:{}, direction:{}"_fmt(pattern.p, point, direction);
 			}
 
 		}
+
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
 		Console << elapsedTime << U"sec";
+
+		/*Board boardForTimeMeasurement = initialBoard;
+		startTime = std::chrono::high_resolution_clock::now();
+		for (const auto& [pattern, point, direction] : solution.steps) {
+			boardForTimeMeasurement.apply_pattern(pattern, point, direction);
+		}
+		currentTime = std::chrono::high_resolution_clock::now();
+		elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+		Console << U"normal board:" << elapsedTime << U"sec";
+
+		OptimizedBoard testBoard = board;
+		startTime = std::chrono::high_resolution_clock::now();
+		for (const auto& [pattern, point, direction] : solution.steps) {
+			board.apply_pattern(pattern, point, direction);
+		}
+		currentTime = std::chrono::high_resolution_clock::now();
+		elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+		Console << U"optimized board:" << elapsedTime << U"sec";*/
 		return solution;
 	}
 
@@ -937,49 +1143,6 @@ namespace Algorithm {
 				if (solutions.size()) return solutions;
 				solutions.emplace_back(dynamicProgramming(initialBoad, patterns, 0));
 				return solutions;
-				//for (const auto& dy : bitDy) {
-				//	for (const auto& dx : bitDx) {
-				//		if (dy <= 0 && dx == 0) continue;
-				//		Solution solution;
-				//		int32 ny = y + dy, nx = x + dx;
-				//		if (ny < 0 || ny >= initialBoad.grid.height() || nx < 0 || nx >= initialBoad.grid.width()) continue;
-				//		if (initialBoad.grid[ny][nx] == initialBoad.goal[y][x]) {
-				//			Console << U"x, y, nx, ny" << Point(x, y) << U" " << Point(nx, ny);
-				//			for (int32 bit = 0; bit <= 8; bit++) {
-				//				if ((abs(dy) >> bit) & 1) {
-				//					auto pattern = patterns[0];
-				//					if (bit == 0) {
-				//						pattern = patterns[0];
-				//					}
-				//					else {
-				//						// idx: 3*(bit-1)+1
-				//						pattern = patterns[3 * (bit - 1) + 1];
-				//					}
-
-				//					int32 dir = dy < 0; // dy > 0 => 上移動
-				//					solution.steps.push_back(std::make_tuple(pattern, Point(x + dx, y), dir));
-				//				}
-				//			}
-				//			for (int32 bit = 0; bit <= 8; bit++) {
-				//				if ((dx >> bit) & 1) {
-				//					auto pattern = patterns[0];
-				//					if (bit == 0) {
-				//						pattern = patterns[0];
-				//					}
-				//					else {
-				//						pattern = patterns[3 * (bit - 1) + 1];
-
-				//					}
-				//					solution.steps.push_back(std::make_tuple(pattern, Point(x, y), 2));
-				//				}
-				//			}
-				//		}
-				//		if (solution.steps.size()) solutions.push_back(solution);
-				//	}
-				//}
-				//if (solutions.size()) return solutions;
-				//solutions.push_back(dynamicProgramming(initialBoad, patterns, 0));
-				//return solutions;
 
 			}
 		}
@@ -1215,7 +1378,7 @@ namespace Algorithm {
 		auto startTime = std::chrono::high_resolution_clock::now();
 
 		int beamWidth = 10;
-		int maxSteps = Min(width * height, 1000);
+		int maxSteps = Min(width * height, 600);
 		for (int32 t = 0; t < maxSteps; t++) {
 			Console << U"{}tern"_fmt(t);
 			std::priority_queue<State, std::vector<State>, decltype(compareStates)> nextBeam(compareStates);
@@ -1375,20 +1538,31 @@ namespace Algorithm {
 	Array<Solution> optimizedNextState(const OptimizedBoard& initialBoard, const Array<Pattern>& patterns) {
 		Array<Solution> solutions;
 		int32 width = initialBoard.width, height = initialBoard.height;
-
 		static const int bitDy[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 		static const int bitDx[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
 		int correctCount = initialBoard.getCorrectCount();
 		int y = correctCount / width, x = correctCount % width;
 		// Console << U"start : " << Point(x, y);
-		const auto& candidates = initialBoard.findPointsWithSameValueAndYPopcountDiff1(x, y);
+		const auto& candidates = initialBoard.sortedFindPointsWithSameValueAndYPopcountDiff1(x, y);
+		// const auto& candidates = initialBoard.findPointsWithSameValueAndYPopcountDiff1(x, y);
+		solutions.reserve(candidates.size());
+		auto evaluateSolution = [](Solution sol, OptimizedBoard b) -> double {
+			double score = 0;
+
+			};
 		// Console << candidates;
 		for (const auto& candidate : candidates) {
 			// Console << U"x,y:" << Point(x, y) << U" cand:" << candidate;
 			Solution solution;
 			int  dy = candidate.second - y, dx = candidate.first - x;
 			int bit = static_cast<int>(std::log2(dy));
-
+			if (dx == 0 && bit > 0) {
+				Solution solutionUsingType2;
+				const Pattern& pattern = patterns[3 * (bit - 1)];
+				solutionUsingType2.steps.emplace_back(pattern, Point(x, y), 0);
+				// solutionUsingType2.score = cnt;
+				solutions.emplace_back(solutionUsingType2);
+			}
 			if (dx > 0) {
 				solution.steps.emplace_back(patterns[22], Point(candidate.first - x - 256, y + 1), 2);
 			}
@@ -1397,39 +1571,11 @@ namespace Algorithm {
 			}
 			const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
 			solution.steps.emplace_back(pattern, Point(x, y), 0);
+			// solution.score = (double)cnt / (1 + dx != 0);
 			solutions.emplace_back(solution);
 		}
+
 		if (!solutions.empty()) return solutions;
-		//if (!solutions.empty()) return solutions;
-		//// 1手で到達可能
-		//for (const auto& dy : bitDy) {
-		//	Solution solution;
-		//	int ny = y + dy;
-		//	if (ny >= height) break;
-		//	if (initialBoard.getGrid(x, ny) != initialBoard.getGoal(x, y)) continue;
-		//	int bit = static_cast<int>(std::log2(dy));
-		//	const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-		//	int dir = (dy < 0) ? 1 : 0; // 0 for up, 1 for down
-		//	solution.steps.emplace_back(pattern, Point(x, y), dir);
-		//	if (!solution.steps.empty()) solutions.push_back(solution);
-		//}
-		//if (!solutions.empty()) return solutions;
-
-
-
-
-
-		//for (const auto& dx : bitDx) {
-		//	Solution solution;
-		//	int nx = x + dx;
-		//	if (nx >= width) break;
-		//	if (initialBoard.getGrid(nx, y) != initialBoard.getGoal(x, y)) continue;
-		//	int bit = static_cast<int>(std::log2(dx));
-		//	const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-		//	solution.steps.emplace_back(pattern, Point(x, y), 2); // 2 for left
-		//	if (!solution.steps.empty()) solutions.push_back(solution);
-		//}
-		//if (!solutions.empty()) return solutions;
 
 		std::vector<int>targets;
 		int target = initialBoard.getGoal(x, y);
@@ -1501,7 +1647,7 @@ namespace Algorithm {
 				int beamWidth = 3;
 				auto startTime = std::chrono::high_resolution_clock::now();
 				State bestState = beam.top();
-				for (int32 t : step(16)) {
+				for (int32 t : step(8)) {
 					Console << U"t:{}"_fmt(t);
 					std::priority_queue<State, std::vector<State>, decltype(compareStates)> nextBeam;
 					for (int32 w = 0; w < beamWidth; w++) {
@@ -1515,22 +1661,19 @@ namespace Algorithm {
 							OptimizedBoard nextBoard = currentState.board;
 							int32 stepSize = solutions.steps.size();
 							if (stepSize == 0) {
-
+								continue;
 							}
 							Solution nextSolution;
 							for (const auto& action : solutions.steps) {
 								const auto& [pattern, point, direction] = action;
-								// Console << U"point{}, dir{}"_fmt(point, direction);
 								nextBoard.apply_pattern(pattern, point, direction);
 								nextSolution.steps.emplace_back(action);
 								currentState.solution.steps.emplace_back(action);
 							}
 							int32 prog = nextBoard.getCorrectCount();
 							double delta = prog - currentState.progress;
-							// double acc = 1 - double(nextBoard.calculateDifference(nextBoard.grid) / (height * width));
-							double newScore = delta / stepSize * pow(prog, 3) / currentState.solution.steps.size() * board.getCorrectCountAll();
-							// double newScore = delta / stepSize * acc;
-							// Console << U"score:" << newScore;
+							// Console << U"score:{}, delta:{}"_fmt(solutions.score, delta/stepSize);
+							double newScore = delta / stepSize * prog / currentState.solution.steps.size() * board.getCorrectCountAll();
 							State newState = State(nextBoard, currentState.solution, newScore, prog);
 
 							if (t == 0) {
@@ -1538,10 +1681,6 @@ namespace Algorithm {
 							}
 							for (int32 _ : step(stepSize)) currentState.solution.steps.pop_back();
 							nextBeam.emplace(newState);
-							/*if (nextBoard.isGoal()) {
-								bestState = currentState;
-								break;
-							}*/
 						}
 					}
 
@@ -1549,9 +1688,9 @@ namespace Algorithm {
 					if (beam.empty()) return bestState.solution;
 					bestState = beam.top();
 					int left = board.width * board.height - bestState.board.getCorrectCount();
-					/*if (left < 500) {
-						beamWidth = Max(20, beamWidth + 1);
-					}*/
+					if (left < 100) {
+						beamWidth = Max(30, beamWidth + 1);
+					}
 					if (bestState.board.isGoal()) {
 						auto currentTime = std::chrono::high_resolution_clock::now();
 						double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();

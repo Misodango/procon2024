@@ -101,16 +101,21 @@ void Board::draw() const {
 	static const ColorF frameColor(U"#594a4e");
 	static const ColorF colors[] = { ColorF(U"#5f6c7b") , ColorF(U"#ef4565") ,ColorF(U"#094067") ,ColorF(U"#33272a") };
 	FontAsset::Register(U"Cell", 20);
-	static const Font font{ cellSize };
+	static const Font font{ 8 };
 	for (int32 y = 0; y < height; ++y) {
 		for (int32 x = 0; x < width; ++x) {
 			// セルの描画
 
 			// Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ? colors[grid[y][x]] : wrongTileColor));
-			Rect(x * cellSize, y * cellSize, cellSize).draw(colors[grid[y][x]]);
+
 			// FontAsset(U"Cell")(grid[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
-			if (Max(height, width) < 128)
+			if (Max(height, width) < 128) {
+				Rect(x * cellSize, y * cellSize, cellSize).draw(colors[grid[y][x]]);
 				if (goal[y][x] != grid[y][x]) font(goal[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
+			}
+			else {
+				Rect(x * cellSize, y * cellSize, cellSize).draw(goal[y][x] == grid[y][x] ? colors[grid[y][x]] : wrongTileColor);
+			}
 
 
 			// グリッドの線を描画
