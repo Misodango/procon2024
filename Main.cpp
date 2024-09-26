@@ -123,6 +123,7 @@ void generateData(int32 width, int32 height, int32 moveCount) {
 
 void Main() {
 	// Window::Resize(1920, 1080);
+	// const auto monitor = *System::EnumerateMonitors().rbegin();
 	const auto monitor = System::EnumerateMonitors()[0];
 	// const ColorF backgroundColor(U"#faeee7");
 	const ColorF backgroundColor(U"#fffffe");
@@ -158,7 +159,7 @@ void Main() {
 	int32 patternHeight = patterns[currentPattern].grid.height();
 	int32 patternWidth = patterns[currentPattern].grid.width();
 
-	Array<Algorithm::Type> algorithms = { Algorithm::Type::Greedy, Algorithm::Type::BeamSearch, Algorithm::Type::DynamicProgramming, Algorithm::Type::RowByGreedy,  Algorithm::Type::RowByRowAdvancedGreedy,
+	Array<Algorithm::Type> algorithms = { Algorithm::Type::Greedy, Algorithm::Type::BeamSearch, Algorithm::Type::DynamicProgramming, Algorithm::Type::SplitGreedy,  Algorithm::Type::RowByRowAdvancedGreedy,
 	Algorithm::Type::OneByOne, Algorithm::Type::DiagonalSearch, Algorithm::Type::SimulatedAnnealing, Algorithm::Type::Dijkstra, Algorithm::Type::HorizontalSwapSort,
 		Algorithm::Type::ChokudaiSearch };
 	GameMode currentMode = GameMode::Manual;
@@ -169,7 +170,7 @@ void Main() {
 	RoundRect resetButton(1100, 974, 200, 50, 5); // 1024 - 50
 	// リセット誤爆防止 10回押したらリセットされる
 	int32 resetFailProof = 0;
-	Array<String> algorithmNames = { U"Greedy", U"BeamSearch", U"DP", U"RowGreedy", U"RowGreedy改", U"OneByOne", U"Diagonal", U"Annealing", U"dijkstra" , U"水平スワップソート", U"chokudai" };
+	Array<String> algorithmNames = { U"Greedy", U"BeamSearch", U"DP", U"SplitGreedy", U"RowGreedy改", U"OneByOne", U"Diagonal", U"Annealing", U"dijkstra" , U"水平スワップソート", U"chokudai" };
 
 	// マウス入力（座標のみ）を無視するかどうか
 	// m キーで切り替え
@@ -322,7 +323,7 @@ void Main() {
 			if (KeyM.down()) {
 				readMouseInput ^= 1;
 			}
-			if (readMouseInput && Cursor::Pos().x >= 0 &&  Cursor::Pos().x < 1024 && Cursor::Pos().y >= 0 && Cursor::Pos().y < 1024) if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0)
+			if (readMouseInput && Cursor::Pos().x >= 0 && Cursor::Pos().x < 1024 && Cursor::Pos().y >= 0 && Cursor::Pos().y < 1024) if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0)
 				patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
 
 			else {
@@ -360,13 +361,16 @@ void Main() {
 					}
 				}
 				else {
+					Array<int> directionCount(4, 0);
 					for (const auto& [solvePattern, solvePos, solveDir] : solution.steps) {
 						board.apply_pattern(solvePattern, solvePos, solveDir);
+						directionCount[solveDir]++;
 						board.draw();
 						System::Update();
 					}
+					Console << directionCount;
 				}
-				solution.outuputToJson();
+				// solution.outuputToJson();
 				// postAnswer(postUrl, token, U"output.json");
 				Console << postUrl;
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
@@ -443,8 +447,8 @@ void Main() {
 			currentMode == GameMode::Manual ? U"Manual" : algorithmNames[currentAlgorithm],
 			progress, nextProgress,
 			patternPos.y >= 0 && patternPos.y < board.height &&
-			patternPos.x >= 0 && patternPos.x < board.width 
-			? board.goal[patternPos.y][patternPos.x]: -1))
+			patternPos.x >= 0 && patternPos.x < board.width
+			? board.goal[patternPos.y][patternPos.x] : -1))
 			.draw(1100, 300, headlineColor);
 
 		// ゴール状態のチェック
