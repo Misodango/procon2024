@@ -11,7 +11,7 @@ namespace Algorithm {
 		Greedy,
 		BeamSearch,
 		DynamicProgramming,
-		RowByGreedy,
+		SplitGreedy,
 		RowByRowAdvancedGreedy,
 		OneByOne,
 		DiagonalSearch,
@@ -65,7 +65,7 @@ namespace Algorithm {
 	Solution greedy(const Board& initialBoard, const Array<Pattern>& patterns);
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns, int32 beamWidth, int32 maxSteps = 1000);
 	Solution dynamicProgramming(const Board& initialBoard, const Array<Pattern>& patterns, double timeLimit);
-	Solution rowByRowAdvancedGreedy(const Board& initialBoard, const Array<Pattern>& patterns);
+	Solution splitGreedy(const Board& initialBoard, const Array<Pattern>& patterns);
 	Solution oneByOne(const Board& initialBoard, const Array<Pattern>& patterns);
 	Solution diagonalSearch(const Board& initialBoard, const Array<Pattern>& patterns);
 	/*
