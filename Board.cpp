@@ -105,10 +105,6 @@ void Board::draw() const {
 	for (int32 y = 0; y < height; ++y) {
 		for (int32 x = 0; x < width; ++x) {
 			// セルの描画
-
-			// Rect(x * cellSize, y * cellSize, cellSize).draw((grid[y][x] == goal[y][x] ? colors[grid[y][x]] : wrongTileColor));
-
-			// FontAsset(U"Cell")(grid[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
 			if (Max(height, width) < 128) {
 				Rect(x * cellSize, y * cellSize, cellSize).draw(colors[grid[y][x]]);
 				if (goal[y][x] != grid[y][x]) font(goal[y][x]).drawAt(x * cellSize + cellSize / 2, y * cellSize + cellSize / 2, textColor);
@@ -116,7 +112,6 @@ void Board::draw() const {
 			else {
 				Rect(x * cellSize, y * cellSize, cellSize).draw(goal[y][x] == grid[y][x] ? colors[grid[y][x]] : wrongTileColor);
 			}
-
 
 			// グリッドの線を描画
 			Rect(x * cellSize, y * cellSize, cellSize).drawFrame(1, gridColor);

@@ -9,16 +9,7 @@ namespace Algorithm {
 
 	enum class Type {
 		Greedy,
-		BeamSearch,
-		DynamicProgramming,
-		SplitGreedy,
-		RowByRowAdvancedGreedy,
-		OneByOne,
-		DiagonalSearch,
-		SimulatedAnnealing,
-		Dijkstra,
-		HorizontalSwapSort,
-		ChokudaiSearch
+		BeamSearch
 	};
 
 	struct Solution {
@@ -63,21 +54,8 @@ namespace Algorithm {
 	};
 
 	Solution greedy(const Board& initialBoard, const Array<Pattern>& patterns);
-	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns, int32 beamWidth, int32 maxSteps = 1000);
-	Solution dynamicProgramming(const Board& initialBoard, const Array<Pattern>& patterns, double timeLimit);
-	Solution splitGreedy(const Board& initialBoard, const Array<Pattern>& patterns);
-	Solution oneByOne(const Board& initialBoard, const Array<Pattern>& patterns);
-	Solution diagonalSearch(const Board& initialBoard, const Array<Pattern>& patterns);
-	/*
-	Solution simulatedAnnealing(const Board& initialBoard, const Array<Pattern>& patterns, int32 sy = 0, int32 sx = 0,
-	 int32 number = 100, double startTemp = 500, double endTemp = 100);
-	 */
-	Solution  simulatedAnnealing(const Board& initialBoard, const Array<Pattern>& patterns);
-	Solution dijkstra(const Board& initialBoard, const Array<Pattern>& patterns);
-	Solution horizontalSwapSort(const Board& initialBoard, const Array<Pattern>& patterns);
-	std::vector<std::pair<int32, int32>> sortToMatchPartially(Array<int32>& A, const Array<int32>& B);
-	Solution swap(const Board& initialBoard, const Array<Pattern>& patterns, int32 i, int32 j, int32 y);
-	Solution chokudaiSearch(const Board& intitialBoard, const Array<Pattern>& patterns);
+
+	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns);
 
 	Solution solve(Type algorithmType, const Board& initialBoard, const Array<Pattern>& patterns);
 
