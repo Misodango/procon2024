@@ -15,7 +15,7 @@ std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 
 	try {
 		json = JSON::Load(path);
-		// const FilePath path = FileSystem::FullPath(U"input.json");
+		const FilePath path = FileSystem::FullPath(U"input.json");
 		Console << U"Full path: " << path;
 		JSON json = JSON::Load(path);
 		if (not json) {
@@ -57,7 +57,7 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 	}
 	else
 	{
-		Console << U"Failed.";
+		Console << U"Get Failed.";
 	}
 
 	return initializeFromJSON(path);
@@ -100,7 +100,6 @@ void Main() {
 	// Window::Resize(1920, 1080);
 	// const auto monitor = *System::EnumerateMonitors().rbegin();
 	const auto monitor = System::EnumerateMonitors()[0];
-	// const ColorF backgroundColor(U"#faeee7");
 	const ColorF backgroundColor(U"#fffffe");
 	Window::Resize(monitor.fullscreenResolution);
 	FontAsset::Register(U"Cell", 20);
@@ -116,17 +115,18 @@ void Main() {
 	const ColorF headlineColor(U"#33272a");
 
 	// PCどうしでやるときはIPアドレスとportを書き換える
-	const URL url = U"192.168.154.167:3000";
+	// const URL url = U"192.168.154.167:3000";
+	const URL url = U"127.0.0.1:8080";
 	const URL getUrl = U"{}/problem"_fmt(url);
 	Console << getUrl;
 	const URL postUrl = U"{}/answer"_fmt(url);
 
 	// tokenはもらったやつを使う
 	const String token = U"token1";
-	// auto [board, patterns] = initializeFromGet(getUrl, token, U"input.json");
+	auto [board, patterns] = initializeFromGet(getUrl, token, U"input.json");
 
 	// JSONファイルからゲームを初期化
-	auto [board, patterns] = initializeFromJSON(U"input.json");
+	// auto [board, patterns] = initializeFromJSON(U"input.json");
 	int32 cellSize = Min(1024 / board.grid.width(), 1024 / board.grid.height());
 	int32 currentPattern = 0;
 	Point patternPos(0, 0);
@@ -146,7 +146,7 @@ void Main() {
 	RoundRect resetButton(1100, 974, 200, 50, 5); // 1024 - 50
 	// リセット誤爆防止 10回押したらリセットされる
 	int32 resetFailProof = 0;
-	const Array<String> algorithmNames = { U"Greedy", U"BeamSearch"};
+	const Array<String> algorithmNames = { U"Greedy", U"BeamSearch" };
 
 	// マウス入力（座標のみ）を無視するかどうか
 	// m キーで切り替え
@@ -185,50 +185,12 @@ void Main() {
 			if (resetFailProof == 10) {
 				resetFailProof = 0;
 				// ファイルから読む
-				board = initializeFromJSON(U"input.json").first;
+				// board = initializeFromJSON(U"input.json").first;
 				// getする
-				// board = initializeFromGet(getUrl, token, U"input.json").first;
+				board = initializeFromGet(getUrl, token, U"input.json").first;
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
 				cellSize = Min(1024 / board.grid.width(), 1024 / board.grid.height());
 				patternPos = Point(0, 0);
-			}
-		}
-
-		// 提出ファイル作成
-		if (KeyO.down()) {
-			if (board.is_goal()) {
-				JSON output;
-				output[U"n"] = static_cast<int32>(answer.steps.size());
-				Array<JSON> ops;
-
-				for (const auto& [solvePattern, solvePos, solveDir] : answer.steps)
-				{
-					JSON stepJson;
-					stepJson[U"p"] = solvePattern.p;
-					stepJson[U"x"] = solvePos.x;
-					stepJson[U"y"] = solvePos.y;
-					stepJson[U"s"] = solveDir;
-					ops << stepJson;
-				}
-
-				output[U"ops"] = ops;
-				Console << U"Writing ...";
-				output.save(U"output.json");
-				Console << U"Wrote ";
-				JSON submission;
-				try {
-					submission = JSON::Load(U"output.json");
-					const FilePath path = FileSystem::FullPath(U"output.json");
-					Console << U"Full path: " << path;
-					JSON submission = JSON::Load(path);
-					if (not submission) {
-						throw Error(U"Failed to load JSON file");
-					}
-					Console << U"Loaded JSON: " << submission;
-				}
-				catch (const Error& error) {
-					Console << U"Error loading JSON: " << error.what();
-				}
 			}
 		}
 
@@ -311,9 +273,11 @@ void Main() {
 				Console << directionCount;
 
 				// 出力と回答
-				// solution.outuputToJson();
-				// postAnswer(postUrl, token, U"output.json");
-				Console << postUrl;
+				if (board.is_goal()) {
+					answer.outuputToJson();
+					postAnswer(postUrl, token, U"output.json");
+					Console << postUrl;
+				}
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
 			}
 		}
