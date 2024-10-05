@@ -63,18 +63,6 @@ private:
 
 };
 
-// std::unordered_mapでBoardをキーとして使用するためのハッシュ関数
-/*
-namespace std {
-	template <>
-	struct hash<Board> {
-		size_t operator()(const Board& b) const {
-			return b.hash();
-		}
-	};
-}
-*/
-
 namespace std {
 	template <>
 	struct hash<Board> {
