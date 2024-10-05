@@ -6,6 +6,15 @@
 #include "Algorithm.h"
 #include "GameMode.h"
 
+// 自身のパソコンのサイズに合わせて設定
+#define BUTTON_X 1100
+
+// 固定値
+#define BOARD_AREA_SIZE 1024
+#define BUTTON_HEIGHT 50
+#define BUTTON_WIDTH 200
+#define BUTTON_ROUND 5
+#define BUTTON_Y(n) (BOARD_AREA_SIZE - 50 - 100 * (4 - (n)))
 
 // JSONからゲームの初期化を行う関数
 std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
@@ -22,6 +31,7 @@ std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 			throw Error(U"Failed to load JSON file");
 		}
 		Console << U"Loaded JSON: " << json;
+		Console << U"starts at " << json[U"startsAt"];
 		// ボードの初期化
 		board = Board::fromJSON(json[U"board"]);
 
@@ -61,17 +71,11 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 	}
 
 	return initializeFromJSON(path);
-	// return { board, patterns };
 }
 
 void postAnswer(const URL& url, const String token, const FilePath& path) {
 
 	const HashTable<String, String> headers = { { U"Procon-Token", token }, {U"Content-Type", U"application/json"} };
-	/*const std::string data = JSON
-	{
-		{ U"body", U"Hello, Siv3D!" },
-		{ U"date", DateTime::Now().format() },
-	}.formatUTF8();*/
 	const std::string data = JSON::Load(path).formatUTF8();
 	const FilePath saveFilePath = U"post_result.json";
 
@@ -95,18 +99,37 @@ void postAnswer(const URL& url, const String token, const FilePath& path) {
 	}
 }
 
+bool isMouseOnBoard() {
+	return 0 <= Cursor::Pos().x && Cursor::Pos().x < BOARD_AREA_SIZE && 0 <= Cursor::Pos().y && Cursor::Pos().y < BOARD_AREA_SIZE;
+}
+
+void drawColorSample() {
+	static const ColorF colors[] = { ColorF(U"#5f6c7b") , ColorF(U"#ef4565") ,ColorF(U"#094067") ,ColorF(U"#33272a") };
+	static const Font font{ 32 };
+	const int offsetX = BUTTON_WIDTH / 4;
+	for (int i : step(4)) {
+		int x = BUTTON_X + offsetX * i, y = 0;
+		Rect(x, y, BUTTON_HEIGHT, BUTTON_HEIGHT).draw(colors[i]);
+		font(i).drawAt(x + BUTTON_HEIGHT / 2, y + BUTTON_HEIGHT / 2);
+	}
+}
 
 void Main() {
-	// Window::Resize(1920, 1080);
+
+	//　シミュレータサイズ
 	// const auto monitor = *System::EnumerateMonitors().rbegin();
 	const auto monitor = System::EnumerateMonitors()[0];
-	const ColorF backgroundColor(U"#fffffe");
 	Window::Resize(monitor.fullscreenResolution);
+
+	// フォント設定
 	FontAsset::Register(U"Cell", 20);
 	FontAsset::Register(U"Button", 30, Typeface::Bold);
+
+	// 背景色
+	const ColorF backgroundColor(U"#fffffe");
 	Scene::SetBackground(backgroundColor);
 
-	// 新しい色（ボタン用）
+	// ボタンの色
 	const ColorF buttonColor(U"#094067");
 	const ColorF white(U"#d8eefe");
 	const ColorF autoColor(U"#5f6c7b");
@@ -120,6 +143,7 @@ void Main() {
 	const URL getUrl = U"{}/problem"_fmt(url);
 	Console << getUrl;
 	const URL postUrl = U"{}/answer"_fmt(url);
+	int gameStartTime = -1;
 
 	// tokenはもらったやつを使う
 	const String token = U"token1";
@@ -127,35 +151,44 @@ void Main() {
 
 	// JSONファイルからゲームを初期化
 	// auto [board, patterns] = initializeFromJSON(U"input.json");
-	int32 cellSize = Min(1024 / board.grid.width(), 1024 / board.grid.height());
+
+	// 盤面１マス当たりのサイズ
+	int32 cellSize = Min(BOARD_AREA_SIZE / board.width, BOARD_AREA_SIZE / board.height);
+
+	// 抜き型設定
 	int32 currentPattern = 0;
 	Point patternPos(0, 0);
 	int32 direction = 0;
 	int32 patternHeight = patterns[currentPattern].grid.height();
 	int32 patternWidth = patterns[currentPattern].grid.width();
 
+	// 使用可能アルゴリズム
 	const Array<Algorithm::Type> algorithms = {
 		Algorithm::Type::Greedy,
 		Algorithm::Type::BeamSearch };
+	const Array<String> algorithmNames = { U"Greedy", U"BeamSearch" };
 
+	// モード設定
 	GameMode currentMode = GameMode::Manual;
 	int32 currentAlgorithm = 0;
-	RoundRect manualButton(1100, 674, 200, 50, 5);
-	RoundRect algorithmButton(1100, 774, 200, 50, 5);
-	RoundRect autoButton(1100, 874, 200, 50, 5);
-	RoundRect resetButton(1100, 974, 200, 50, 5); // 1024 - 50
-	// リセット誤爆防止 10回押したらリセットされる
-	int32 resetFailProof = 0;
-	const Array<String> algorithmNames = { U"Greedy", U"BeamSearch" };
+
+	// ボタン設定
+	RoundRect manualButton(BUTTON_X, BUTTON_Y(1), BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_ROUND);
+	RoundRect algorithmButton(BUTTON_X, BUTTON_Y(2), BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_ROUND);
+	RoundRect autoButton(BUTTON_X, BUTTON_Y(3), BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_ROUND);
+	RoundRect resetButton(BUTTON_X, BUTTON_Y(4), BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_ROUND);
+
+	// リセット機能
+	// 10回押したらリセットされる
+	int32 resetConfirmationCount = 0;
 
 	// マウス入力（座標のみ）を無視するかどうか
 	// m キーで切り替え
 	bool readMouseInput = 1; // 1 -> 入力
 
 	// 進度
-	double progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
+	double progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.height * board.width)));
 	double nextProgress = progress;
-
 
 	//回答用
 	Algorithm::Solution answer;
@@ -176,20 +209,28 @@ void Main() {
 		// リセット
 		// 10回押したら発動
 		if (resetButton.leftClicked()) {
-			resetFailProof++;
+			resetConfirmationCount++;
 			// resetボタン付近の座標が型抜きに適用されてしまうのを防ぐためにモードを変更
 			currentMode = GameMode::Auto;
 
+			// 回答を初期化
 			answer = Algorithm::Solution();
 
-			if (resetFailProof == 10) {
-				resetFailProof = 0;
+			if (resetConfirmationCount == 10) {
+				resetConfirmationCount = 0;
 				// ファイルから読む
 				// board = initializeFromJSON(U"input.json").first;
+
 				// getする
 				board = initializeFromGet(getUrl, token, U"input.json").first;
-				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
-				cellSize = Min(1024 / board.grid.width(), 1024 / board.grid.height());
+
+				// 進度初期化
+				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.height * board.width)));
+
+				// 盤面サイズ初期化
+				cellSize = Min(BOARD_AREA_SIZE / board.width, BOARD_AREA_SIZE / board.height);
+
+				// 範囲外適用を避けるため抜き型座標を初期化
 				patternPos = Point(0, 0);
 			}
 		}
@@ -198,8 +239,10 @@ void Main() {
 		if (autoButton.leftClicked()) {
 			// 既に揃っていたらリプレイ
 			if (board.is_goal()) {
+				// get時に"input.json"に保存済み
 				board = initializeFromJSON(U"input.json").first;
 
+				// 適用&リプレイ
 				for (const auto& [pattern, point, direction] : answer.steps) {
 					board.apply_pattern(pattern, point, direction);
 					board.draw();
@@ -211,6 +254,7 @@ void Main() {
 				// 現在の盤面からスタート
 				const auto& solution = Algorithm::solve(Algorithm::Type::Greedy, board, patterns);
 
+				// 適用&回答に保存
 				for (const auto& action : solution.steps) {
 					const auto& [pattern, point, direction] = action;
 					board.apply_pattern(pattern, point, direction);
@@ -222,31 +266,38 @@ void Main() {
 
 		// 人力の入力処理
 		if (currentMode == GameMode::Manual) {
+
+			// マウス入力のオンオフを切り替え
 			if (KeyM.down()) {
 				readMouseInput ^= 1;
 			}
-			if (readMouseInput && Cursor::Pos().x >= 0 && Cursor::Pos().x < 1024 && Cursor::Pos().y >= 0 && Cursor::Pos().y < 1024) if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0)
-				patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
 
-			else {
-				// 入力処理
-				if (KeyLeft.down()) patternPos.x = Max(-patternWidth + 1, patternPos.x - 1);
-				if (KeyRight.down()) patternPos.x = Min(board.width - 1, patternPos.x + 1);
-				if (KeyUp.down()) patternPos.y = Max(-patternHeight + 1, patternPos.y - 1);
-				if (KeyDown.down()) patternPos.y = Min(board.height - 1, patternPos.y + 1);
-				if (KeyTab.down()) {
-					currentPattern = (currentPattern + 1) % patterns.size();
-					patternHeight = patterns[currentPattern].grid.height();
-					patternWidth = patterns[currentPattern].grid.width();
-					patternPos = Point(0, 0);
+			// マウス入力オン & マウスが盤面の上にある & マウスが動いたら
+			// マウス座標に抜き型を置く
+			if (readMouseInput && isMouseOnBoard()) {
+				if (Cursor::Delta().x != 0 || Cursor::Delta().y != 0)
+					patternPos = Point(Cursor::Pos().x / cellSize, Cursor::Pos().y / cellSize);
+
+				else {
+					// 入力処理
+					if (KeyLeft.down()) patternPos.x = Max(-patternWidth + 1, patternPos.x - 1);
+					if (KeyRight.down()) patternPos.x = Min(board.width - 1, patternPos.x + 1);
+					if (KeyUp.down()) patternPos.y = Max(-patternHeight + 1, patternPos.y - 1);
+					if (KeyDown.down()) patternPos.y = Min(board.height - 1, patternPos.y + 1);
+					if (KeyTab.down()) {
+						currentPattern = (currentPattern + 1) % patterns.size();
+						patternHeight = patterns[currentPattern].grid.height();
+						patternWidth = patterns[currentPattern].grid.width();
+						patternPos = Point(0, 0);
+					}
+					if (KeyR.down()) direction = (direction + 1) % 4;
+					if (KeySpace.down() || MouseL.down()) {
+						board.apply_pattern(patterns[currentPattern], patternPos, direction);
+						answer.steps.emplace_back(patterns[currentPattern], patternPos, direction);
+					}
+					progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.height * board.width)));
+					nextProgress = 100.0 * board.calculateNextProgress(patterns[currentPattern], patternPos, direction) / double(board.height * board.width);
 				}
-				if (KeyR.down()) direction = (direction + 1) % 4;
-				if (KeySpace.down() || MouseL.down()) {
-					board.apply_pattern(patterns[currentPattern], patternPos, direction);
-					answer.steps.emplace_back(patterns[currentPattern], patternPos, direction);
-				}
-				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
-				nextProgress = 100.0 * board.calculateNextProgress(patterns[currentPattern], patternPos, direction) / double(board.grid.height() * board.grid.width());
 			}
 		}
 		else {
@@ -278,14 +329,14 @@ void Main() {
 					postAnswer(postUrl, token, U"output.json");
 					Console << postUrl;
 				}
-				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.grid.height() * board.grid.width())));
+				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.height * board.width)));
 			}
 		}
 		// 描画
 		board.draw();
 
-		// 現在のパターンを描画
-		// 盤面が128より大きいと人力はに合わない
+		// 現在の抜き型を描画
+		// 盤面が128より大きいと人力はに合わないので描画しない
 		if (board.height < 128 && board.width < 128) {
 			for (int32 y = 0; y < patterns[currentPattern].grid.height(); ++y) {
 				for (int32 x = 0; x < patterns[currentPattern].grid.width(); ++x) {
@@ -306,20 +357,57 @@ void Main() {
 		FontAsset(U"Button")(U"Manual").drawAt(manualButton.center(), buttonTextColor);
 		FontAsset(U"Button")(U"Algo").drawAt(algorithmButton.center(), buttonTextColor);
 		FontAsset(U"Button")(U"Auto").drawAt(autoButton.center(), buttonTextColor);
-		FontAsset(U"Button")(U"!!Reset!!").drawAt(resetButton.center(), buttonTextColor);
+		// ９回ボタンを押すと点滅
+		// -> あと一回でリセットの意
+		const double p2 = Periodic::Sine0_1(1s);
+		FontAsset(U"Button")(U"!!Reset!!").drawAt(resetButton.center(), (resetConfirmationCount == 9) ? buttonTextColor * p2 : buttonTextColor);
 
 		// 情報表示
-		FontAsset(U"Cell")(U"Pattern: {}\nPosition: ({},{})\nDirection: {}\nMode: {}\nProgress: {}%\nPrediction: {}%\nActual:{}"_fmt(
-			patterns[currentPattern].p, patternPos.x, patternPos.y, U"↑↓←→"[direction],
-			currentMode == GameMode::Manual ? U"Manual" : algorithmNames[currentAlgorithm],
-			progress, nextProgress,
-			patternPos.y >= 0 && patternPos.y < board.height &&
-			patternPos.x >= 0 && patternPos.x < board.width
-			? board.goal[patternPos.y][patternPos.x] : -1))
-			.draw(1100, 300, headlineColor);
+		// 実際の値を計算
+		const int actualValue =
+			(patternPos.y >= 0 && patternPos.y < board.height && patternPos.x >= 0 && patternPos.x < board.width)
+			? board.goal[patternPos.y][patternPos.x] : -1;
 
+		// モード文字列の取得
+		const String modeString = currentMode == GameMode::Manual
+			? U"Manual"
+			: algorithmNames[currentAlgorithm];
+
+		const String formatString =
+			U"Pattern: {}\n"		// 現在の抜き型
+			U"Position: ({},{})\n"  // 抜き型の位置
+			U"Direction: {}\n"		// 適用の方向
+			U"Mode: {}\n"			// モード
+			U"Progress: {}%\n"		// 進度
+			U"Prediction: {}%\n"	// マニュアルモードで現在の抜き型を適用した時の進度を先読み
+			U"Actual: {}"_fmt(		// カーソルがある位置の正しい要素
+			patterns[currentPattern].p,
+			patternPos.x, patternPos.y,
+			U"↑↓←→"[direction],
+			modeString,
+			progress,
+			nextProgress,
+			actualValue
+			);
+
+		// フォーマット適用
+		FontAsset(U"Cell")(formatString).draw(BUTTON_X, 300, headlineColor);
+
+		// 色見本表示
+		drawColorSample();
+
+		// 不正なサイズ
+		// 問題が読み取れていない場合はサイズが１になる
+		if (board.height < 32 || board.width < 32) {
+			if (1) {
+				// 試合開始前の場合
+				FontAsset(U"Cell")(U"Game Not Started").drawAt(Scene::Center(), Palette::Red);
+			}
+			else FontAsset(U"Cell")(U"Invalid Board").drawAt(Scene::Center(), Palette::Red);
+
+		}
 		// ゴール状態のチェック
-		if (board.is_goal()) {
+		else if (board.is_goal()) {
 			FontAsset(U"Cell")(U"Goal Reached!").drawAt(Scene::Center(), Palette::Red);
 		}
 
