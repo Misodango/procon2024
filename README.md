@@ -4,6 +4,59 @@
 - これは、第35回全国高等専門学校プログラミングコンテスト 競技部門のために開発されたソフトウェアです。
 - 言語としてC++を用いており、Visual Studio上で完結します。
 
+## ファイル構成
+
+### [Main.cpp](./Main.cpp)
+試合進行の中心となるファイルです。以下の機能を提供します：
+- 試合の操作制御
+- アルゴリズムの実行
+- 人力/自動モードの切り替え
+- リセット機能
+- 競技サーバーとのHTTP通信
+- リプレイ検証
+
+### Board
+- [Board.h](./Board.h)
+- [Board.cpp](./Board.cpp)
+
+問題盤面のクラスを定義しています。ゲームの状態管理を担当します。
+
+### Algorithm
+- [Algorithm.h](./Algorithm.h)
+- [Algorithm.cpp](./Algorithm.cpp)
+
+試合で使用するアルゴリズムを実装しています：
+- 貪欲法
+- ビームサーチ
+- 最適化された盤面（OptimizedBoard）
+  - 元の盤面を32倍圧縮し、高速化を実現
+
+### [GameMode.h](./GameMode.h)
+ゲームモードの選択を管理します：
+- アルゴリズムモード
+- 人力操作モード
+- 自動実行モード
+
+### [Pattern.h](./Pattern.h)
+パターンの処理を担当：
+- JSONからのパターン取得
+
+### [StandardPatterns.h](./StandardPatterns.h)
+一般抜き型パターンの生成を行います。
+
+## 開発環境
+- Siv3D
+
+## 使用方法
+1. プロジェクトをクローン
+2. Siv3Dの環境をセットアップ
+3. プロジェクトをビルド
+4. Main.cppを実行して試合を開始
+
+## 注意事項
+- 競技サーバーとの通信にはインターネット接続が必要です
+- リプレイ機能を使用する際は、保存されたデータが必要になります
+
 # installation(メンバー向け)
 
 visual studio上からこのレポジトリをクローンし、siv3dのパスを通してください。
@@ -17,40 +70,3 @@ visual studio上からこのレポジトリをクローンし、siv3dのパス�
 siv3dを最新版にしたら、[ここ](https://zenn.dev/link/comments/8aaf45fc5ae077)を参考に、設定をしてください。
 
 App下のディレクトリの置換とリビルドを忘れずに！
-
-
-
-# 盤面管理統合ソフト
-競技サーバーとのHTTP通信、データの管理、データの表示、職人の行動決定をすることが出来るソフトウェアです。
-- [Main.cpp](Main.cpp)
-  - 試合全体の処理の流れが書いてあります。
-- [](Procon2023/Player(enemy)/Main.cpp)
-  - 1台のPCで対戦をする際に、Playerと同時に実行するプロジェクトです。
-  - 本番では使用しません。
-- [Player(training)](Procon2023/Player(training)/Main.cpp), [Player(enemy)(training)](Procon2023/Player(enemy)(training)/Main.cpp)
-  - 試合を複数回、連続で実行するときに用いるプロジェクトです。
-  - ニューラルネットワーク用に大量の対戦データを生成するときに使います。
-  - 本番では使用しません。
-- [server](Procon2023/server/server.py)
-  - プロコン公式サイトで配布された、簡易競技サーバーを簡単に動かすためのプロジェクトです。
-  - 1台のPCで対戦をする際に、Playerと同時に実行するプロジェクトです。
-  - 本番では使用しません。
-- [no_time_server](Procon2023/no_time_server/no_time_server.py)
-  - 対戦の高速化のために、1から自作した競技サーバーです。
-  - POSTリクエストを受け取り次第盤面を遷移します。
-  - 本番では使用しません。
-- [keras_server](Procon2023/keras_server/keras_server.py)
-  - ニューラルネットワークによって盤面価値を計算するプロジェクトです。
-  - ローカルホストを用いたHTTP通信により、C++とPython間でのデータ共有を行います。
-- [Game.hpp](Procon2023/include/Game.hpp)
-  - 試合全般を管理するクラスです。
-  - 行動の決定やHTTP通信、画面表示をするために必要な全てのメソッドの宣言が書かれています。
-- [Algorithm.cpp](Procon2023/include/Algorithm.cpp)
-  - 行動決定のためのアルゴリズムが複数書かれたcppファイルです。
-  - 本番では、ここに書かれたメソッドの中から一つを選んで使用します。
-
-
-- [lenet_2.py](value_network_training/lenet_2.py)
-  - 大量の対戦データから盤面価値を計算するニューラルネットワークを学習するプログラムです。畳み込みニューラルネットワークの一つであるlenetを改良したものとなっています。
-- [try_model.py](value_network_training/try_model.py)
-  - lenet_2.pyによって学習されたデータmy_regression_model.h5を読み込み推論の確認を行うプログラムです。
