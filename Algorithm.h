@@ -9,7 +9,8 @@ namespace Algorithm {
 
 	enum class Type {
 		Greedy,
-		BeamSearch
+		BeamSearch,
+		Greedy2
 	};
 
 	struct Solution {
@@ -56,6 +57,9 @@ namespace Algorithm {
 	Solution greedy(const Board& initialBoard, const Array<Pattern>& patterns);
 
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns);
+
+	Solution greedy2(const Board& initialBoard, const Array<Pattern>& patterns);
+
 
 	Solution solve(Type algorithmType, const Board& initialBoard, const Array<Pattern>& patterns);
 

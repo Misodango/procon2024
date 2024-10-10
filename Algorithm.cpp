@@ -384,6 +384,17 @@ namespace Algorithm {
 			return count;
 		}
 
+		int getCorrectCountByRow() const {
+			int res = 0;
+			for (int x : step(width)) {
+				for (int y : step(height)) {
+					if (getGrid(x, y) != getGoal(x, y)) return res;
+					res++;
+				}
+			}
+			return res;
+		}
+
 		//　任意の点から何マスまで揃っているか
 		int getCorrectCountFrom(int startX, int startY) const {
 			int count = 0;
@@ -413,6 +424,15 @@ namespace Algorithm {
 			}
 
 			return count;
+		}
+
+		//　任意の行が何個揃っているか
+		int getCorrectCountByRrow(int row)const {
+			int res = 0;
+			for (int x : step(width)) {
+				res += getGoal(x, row) == getGrid(x, row);
+			}
+			return res;
 		}
 
 		Point findClosestPointWithSameValue(int a, int b) const {
@@ -474,7 +494,9 @@ namespace Algorithm {
 			return result;
 		}
 
-		std::vector<std::pair<int, int>> sortedFindPointsWithSameValueAndYPopcountDiff1(int a, int b) const {
+		// 走査したい行をしていできる
+		// popcount(specificY - b) == 1である必要がある
+		std::vector<std::pair<int, int>> sortedFindPointsWithSameValueAndYPopcountDiff1(int a, int b, int specificY = -1) const {
 			int targetValue = getGoal(a, b);
 			std::vector<std::tuple<int, int, float>> result; // (x, y, count)
 
@@ -488,9 +510,23 @@ namespace Algorithm {
 				return dy + getCorrectCountFrom(sx, sy);
 				};
 
-			for (const int dy : {1, 2, 4, 8, 16, 32, 64}) {
-				int ny = b + dy;
-				if (ny >= height) break;
+			if (specificY == -1) {
+				for (const int dy : { 1, 2, 4, 8, 16, 32, 64}) {
+					if (dy == 1 && b < height - 2) continue;
+					int ny = b + dy;
+					if (ny >= height) break;
+					for (int x : step(width)) {
+						if (getGrid(x, ny) == targetValue) {
+							int count = calculateCount(a, b, x, ny);
+							int stepSize = x == a ? 1 : 2;
+							result.emplace_back(x, ny, count / stepSize);
+
+						}
+					}
+				}
+			}
+			else {
+				int ny = specificY;
 				for (int x : step(width)) {
 					if (getGrid(x, ny) == targetValue) {
 						int count = calculateCount(a, b, x, ny);
@@ -516,143 +552,18 @@ namespace Algorithm {
 			}
 
 			return sortedResult;
-		}
-
-		std::vector<std::pair<int, int>> sortedFindPointsWithSameValueAndMakeColumn(int a, int b) const {
-			int targetValue = getGoal(a, b);
-			std::vector<std::tuple<int, int, float>> result; // (x, y, count)
-			std::vector<std::pair<int, int>> res;
-			auto calculateCount = [&](int sx, int sy, int nx, int ny) {
-				int dy = ny - sy;
-				for (int i = 0; i < dy; i++) {
-					if (getGoal(sx + i, sy) != getGrid((nx + i) % width, ny)) return i;
-				}
-				int progress = sx + dy + sy * width;
-				sx = progress % width; sy = progress / width;
-				return dy + getCorrectCountFrom(sx, sy);
-				};
-			for (const int dy : {1, 2, 4, 8, 16, 32, 64}) {
-				int ny = b + dy;
-				if (ny >= height) continue;
-				if (getGrid(a, ny) == targetValue) {
-					int count = calculateCount(a, b, a, ny);
-					result.emplace_back(a, ny, count);
-					// res.emplace_back(a, ny);
-				}
-				/*for (int x : step(width)) {
-					if (getGrid(x, ny) == targetValue) {
-						int count = calculateCount(a, b, x, ny);
-						int stepSize = x == a ? 1 : 2;
-						result.emplace_back(x, ny, count / stepSize);
-					}
-				}*/
-			}
-			// return res;
-
-			// Sort result based on count in descending order
-			std::sort(result.begin(), result.end(),
-					  [](const auto& a, const auto& b) { return std::get<2>(a) > std::get<2>(b); });
-
-			// Convert sorted result to vector of pairs (x, y)
-			std::vector<std::pair<int, int>> sortedResult;
-			sortedResult.reserve(result.size());
-			float maxCount = 0;
-			for (const auto& [x, y, count] : result) {
-				maxCount = Max(maxCount, count);
-				if (count < maxCount) break;
-				sortedResult.emplace_back(x, y);
-			}
-
-			return sortedResult;
-		}
-
-		std::vector<std::pair<int, int>> sortedFindPointsWithSameValueInSameRow(int a, int b) const {
-			int targetValue = getGoal(a, b);
-			std::vector<std::tuple<int, int, float>> result; // (x, y, count)
-
-			auto calculateCount = [&](int sx, int sy, int nx, int ny) {
-				for (int i = sx; i < width; i++) {
-					if (getGoal(i, sy) != getGrid((nx + i - sx) % width, ny)) return i - sx;
-				}
-				return width - sx;
-				};
-
-			for (int nx = a; nx < width; nx++) {
-				if (getGrid(nx, b) == targetValue) {
-					int count = calculateCount(a, b, nx, b);
-					result.emplace_back(nx, b, popcount(nx - a));
-				}
-			}
-
-			// Sort result based on count in descending order
-			std::sort(result.begin(), result.end(),
-					  [](const auto& a, const auto& b) { return std::get<2>(a) > std::get<2>(b); });
-
-			// Convert sorted result to vector of pairs (x, y)
-			std::vector<std::pair<int, int>> sortedResult;
-			sortedResult.reserve(result.size());
-			float maxCount = 0;
-			for (const auto& [x, y, count] : result) {
-				maxCount = Max(maxCount, count);
-				if (count < maxCount) break;
-				sortedResult.emplace_back(x, y);
-			}
-
-			return sortedResult;
-		}
-
-		std::vector<std::tuple<int, int, float>> sortedFindNextPoint(int a, int b) const {
-			int targetValue = getGoal(a, b);
-			std::vector<std::tuple<int, int, float>> result; // (x, y, count)
-
-			auto calculateCount = [&](int sx, int sy, int nx, int ny) {
-				int dy = ny - sy;
-				for (int i = 0; i < dy; i++) {
-					if (getGoal(sx + i, sy) != getGrid((nx + i) % width, ny)) return i;
-				}
-				int progress = sx + dy + sy * width;
-				sx = progress % width; sy = progress / width;
-				return dy + getCorrectCountFrom(sx, sy);
-				};
-
-			for (int ny = (b == height) ? b : b + 1; ny < height; ny++) {
-				for (int x : step(width)) {
-					if (getGrid(x, ny) == targetValue) {
-						int count = calculateCount(a, b, x, ny);
-						int stepSize = x == a ? 1 : 2;
-						stepSize += popcount(ny - b);
-						result.emplace_back(x, ny, count / stepSize);
-					}
-				}
-			}
-
-			if (result.empty()) return result;
-
-			// Sort result based on count in descending order
-			std::sort(result.begin(), result.end(),
-					  [](const auto& a, const auto& b) { return std::get<2>(a) > std::get<2>(b); });
-
-			int maxValue = std::get<2>(result[0]);
-
-			// Use std::partition to move all elements with the maximum value to the beginning
-			auto it = std::partition(result.begin(), result.end(),
-									 [maxValue](const auto& tuple) { return std::get<2>(tuple) == maxValue; });
-
-			// Erase all elements after the partition point
-			result.erase(it, result.end());
-
-			return result;
 		}
 
 		// 特定の行を抜き出す
-		OptimizedBoard extractRow(int y) const {
-			if (y < 0 || y >= height) {
+		OptimizedBoard extractRow(int goalRow, int currentRow) const {
+			if (currentRow < 0 || currentRow >= height || goalRow < 0 || goalRow >= height) {
 				throw std::out_of_range("Invalid row index");
 			}
 
 			OptimizedBoard newBoard(width, 1);
 			for (int x = 0; x < width; ++x) {
-				newBoard.set(x, 0, getGrid(x, y));
+				newBoard.set(x, 0, getGrid(x, currentRow));
+				newBoard._set(x, 0, getGoal(x, goalRow));
 			}
 			return newBoard;
 		}
@@ -844,7 +755,7 @@ namespace Algorithm {
 		int y = correctCount / width, x = correctCount % width;
 		// Console << U"start : " << Point(x, y);
 		const auto& candidates = initialBoard.sortedFindPointsWithSameValueAndYPopcountDiff1(x, y);
-		// const auto& candidates = initialBoard.findPointsWithSameValueAndYPopcountDiff1(x, y);
+
 		solutions.reserve(candidates.size());
 		auto evaluateSolution = [](Solution sol, OptimizedBoard b) -> double {
 			double score = 0;
@@ -1025,7 +936,146 @@ namespace Algorithm {
 		Console << elapsedTime << U"sec";
 		return solution;
 	}
-	
+
+
+	Solution greedy2(const Board& initialBoard, const Array<Pattern>& patterns) {
+		OptimizedBoard board(initialBoard.width, initialBoard.height, initialBoard.grid, initialBoard.goal);
+		// Z字に進行(横書き文章の順)
+		// 3HWで解く
+		// 1番右の列を移動につかうことで3HWで解ける?
+		auto startTime = std::chrono::high_resolution_clock::now();
+		Solution solution;
+		while (!board.isGoal()) {
+
+			int32 progress = board.getCorrectCount();
+			int32 sy = progress / board.width, sx = progress % board.width;
+			Console << U"sy:" << sy;
+			const auto& candidates = board.sortedFindPointsWithSameValueAndYPopcountDiff1(sx, sy);
+
+			Solution bestSolution;
+			double bestProgressDelta = 0;
+
+			for (const auto& [nx, ny] : candidates) {
+				OptimizedBoard currentBoard = board;
+				// Console << U"nx, ny : " << Point(nx, ny);
+				Solution currentSolution;
+				const int32 dy = ny - sy, dx = nx - sx;
+				if (dx > 0) {
+					currentBoard.apply_pattern(patterns[22], Point(dx - 256, ny), 2);
+					currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, ny), 2);
+				}
+				else if (dx < 0) {
+					currentBoard.apply_pattern(patterns[22], Point(dx + board.width, ny), 3);
+					currentSolution.steps.emplace_back(patterns[22], Point(dx + board.width, ny), 3);
+				}
+
+				// 縦移動する前に１つ下を少し揃える
+				if (sx < board.height - 1) {
+					// additional(x,y)
+					const auto& additionalCandidates = currentBoard.sortedFindPointsWithSameValueAndYPopcountDiff1(sx, sy + 1, ny + 1);
+					if (!additionalCandidates.empty()) {
+						const auto& [ax, ay] = additionalCandidates[0];
+						assert(ay == ny + 1);
+						const int32 aDx = ax - sx;
+						if (aDx > 0) {
+							currentBoard.apply_pattern(patterns[22], Point(aDx - 256, ny + 1), 2);
+							currentSolution.steps.emplace_back(patterns[22], Point(aDx - 256, ny + 1), 2);
+						}
+						else if (aDx < 0) {
+							currentBoard.apply_pattern(patterns[22], Point(aDx + board.width, ny + 1), 3);
+							currentSolution.steps.emplace_back(patterns[22], Point(aDx + board.width, ny + 1), 3);
+						}
+					}
+				}
+
+				if (dy > 0) {
+					const int bit = log2(dy);
+					const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+					currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
+					currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+				}
+				if (currentSolution.steps.size() == 0) {
+					// Console << U"step size 0 " << Point(nx, ny);
+					continue;
+				}
+				double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
+				if (currentProgressDelta > bestProgressDelta) {
+					bestProgressDelta = currentProgressDelta;
+					bestSolution = currentSolution;
+				}
+			}
+
+			if (bestSolution.steps.empty()) {
+				int32 target = board.getGoal(sx, sy);
+				progress = board.getCorrectCount();
+				/*for (int32 ny = sy; ny < board.height; ny++) {
+					for (int32 nx = sx; nx < board.width; nx++) {*/
+				for (int32 i = progress; i < board.height * board.width; i++) {
+					int32 ny = i / board.width, nx = i % board.width;
+					if (board.getGrid(nx, ny) != target) continue;
+					OptimizedBoard currentBoard = board;
+					Solution currentSolution;
+					uint32 dy = ny - sy, dx = nx - sx;
+					// Console << U"nx, ny:" << Point(nx, ny);
+					// １行でも(nx, ny)と(sx, sy)に空き行があれば１手で横移動できる
+					if (dy > 1) {
+						if (dx > 0) {
+							currentBoard.apply_pattern(patterns[22], Point(dx - 256, ny), 2);
+							currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, ny), 2);
+						}
+						else if (dx < 0) {
+							currentBoard.apply_pattern(patterns[22], Point(dx + board.width, ny), 3);
+							currentSolution.steps.emplace_back(patterns[22], Point(dx + board.width, ny), 3);
+						}
+					}
+					else {
+
+						for (int bit : step(8)) {
+							if ((dx >> bit) & 1) {
+								const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+								currentBoard.apply_pattern(pattern, Point(sx, sy), 2);
+								currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
+							}
+						}
+					}
+
+					if (dy > 0)for (int bit : step(8)) {
+						if ((dy >> bit) & 1) {
+							const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+							currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
+							currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+						}
+					}
+
+					if (currentSolution.steps.size() == 0) {
+						// Console << U"step size 0(y popcount not 0) " << Point(nx, ny);
+						continue;
+					}
+					double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
+
+					if (currentProgressDelta > bestProgressDelta) {
+						bestProgressDelta = currentProgressDelta;
+						bestSolution = currentSolution;
+
+					}
+				}
+			}
+
+			for (const auto& action : bestSolution.steps) {
+				const auto& [pattern, point, direction] = action;
+				board.apply_pattern(pattern, point, direction);
+				solution.steps.emplace_back(action);
+				// Console << U"pattern:{}, Point:{}, direction:{}"_fmt(pattern.p, point, direction);
+			}
+
+		}
+
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+		Console << elapsedTime << U"sec";
+
+		return solution;
+	}
 
 	Solution solve(Type algorithmType, const Board& initialBoard, const Array<Pattern>& patterns) {
 		switch (algorithmType) {
@@ -1035,6 +1085,8 @@ namespace Algorithm {
 		case Type::BeamSearch:
 			return beamSearch(initialBoard, patterns);
 
+		case Type::Greedy2:
+			return greedy2(initialBoard, patterns);
 		default:
 			throw Error(U"Unknown algorithm type");
 		}
