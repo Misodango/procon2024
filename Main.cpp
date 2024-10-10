@@ -114,6 +114,17 @@ void drawColorSample() {
 	}
 }
 
+void patternDraw(const Array<Pattern>& patterns, int currentPattern, const int cellSize, const Point& patternPos) {
+	for (int32 y = 0; y < patterns[currentPattern].grid.height(); ++y) {
+		for (int32 x = 0; x < patterns[currentPattern].grid.width(); ++x) {
+			if (patterns[currentPattern].grid[y][x] == 1) {
+				Rect((patternPos.x + x) * cellSize, (patternPos.y + y) * cellSize, cellSize)
+					.draw(ColorF(1.0, 0.0, 0.0, 0.5));
+			}
+		}
+	}
+}
+
 void Main() {
 
 	//　シミュレータサイズ
@@ -165,8 +176,10 @@ void Main() {
 	// 使用可能アルゴリズム
 	const Array<Algorithm::Type> algorithms = {
 		Algorithm::Type::Greedy,
-		Algorithm::Type::BeamSearch };
-	const Array<String> algorithmNames = { U"Greedy", U"BeamSearch" };
+		Algorithm::Type::BeamSearch,
+		Algorithm::Type::Greedy2,
+	};
+	const Array<String> algorithmNames = { U"Greedy", U"BeamSearch", U"Greedy2" };
 
 	// モード設定
 	GameMode currentMode = GameMode::Manual;
@@ -241,13 +254,46 @@ void Main() {
 			if (board.is_goal()) {
 				// get時に"input.json"に保存済み
 				board = initializeFromJSON(U"input.json").first;
+				// リプレイ用の一時的な盤面
+				Board replayBoard = board;
+				size_t currentStep = 0;
 
-				// 適用&リプレイ
-				for (const auto& [pattern, point, direction] : answer.steps) {
-					board.apply_pattern(pattern, point, direction);
-					board.draw();
+				while (currentStep < answer.steps.size()) {
+					// 現在の状態を描画
+					replayBoard.draw();
+
+					// 次のステップのプレビューを表示
+					if (currentStep < answer.steps.size()) {
+						const auto& [pattern, point, direction] = answer.steps[currentStep];
+						patternDraw(patterns, pattern.p, cellSize, point);
+					}
+
+					// 「次へ」ボタンの描画
+					if (SimpleGUI::Button(U"Next", Vec2(BUTTON_X, 20))) {
+						if (currentStep < answer.steps.size()) {
+							const auto& [pattern, point, direction] = answer.steps[currentStep];
+							replayBoard.apply_pattern(pattern, point, direction);
+							currentStep++;
+						}
+					}
+
+					// 「最後まで」ボタンの描画
+					if (SimpleGUI::Button(U"Skip to End", Vec2(BUTTON_X, 60))) {
+						while (currentStep < answer.steps.size()) {
+							const auto& [pattern, point, direction] = answer.steps[currentStep];
+							replayBoard.apply_pattern(pattern, point, direction);
+							currentStep++;
+						}
+					}
+
+					// ステップ数の表示
+					FontAsset(U"Regular")(U"{}/{}"_fmt(currentStep, answer.steps.size())).draw(700, 100);
+
 					System::Update();
 				}
+
+				// リプレイ終了後、実際のboardを更新
+				board = replayBoard;
 
 			}
 			else {
@@ -336,16 +382,8 @@ void Main() {
 		board.draw();
 
 		// 現在の抜き型を描画
-		// 盤面が128より大きいと人力はに合わないので描画しない
-		if (board.height < 128 && board.width < 128) {
-			for (int32 y = 0; y < patterns[currentPattern].grid.height(); ++y) {
-				for (int32 x = 0; x < patterns[currentPattern].grid.width(); ++x) {
-					if (patterns[currentPattern].grid[y][x] == 1) {
-						Rect((patternPos.x + x) * cellSize, (patternPos.y + y) * cellSize, cellSize)
-							.draw(ColorF(1.0, 0.0, 0.0, 0.5));
-					}
-				}
-			}
+		if (GameMode::Manual) {
+			patternDraw(patterns, currentPattern, cellSize, patternPos);
 		}
 
 
@@ -380,14 +418,16 @@ void Main() {
 			U"Mode: {}\n"			// モード
 			U"Progress: {}%\n"		// 進度
 			U"Prediction: {}%\n"	// マニュアルモードで現在の抜き型を適用した時の進度を先読み
-			U"Actual: {}"_fmt(		// カーソルがある位置の正しい要素
+			U"Actual: {}\n"		// カーソルがある位置の正しい要素
+			U"Step Size: {}"_fmt(
 			patterns[currentPattern].p,
 			patternPos.x, patternPos.y,
 			U"↑↓←→"[direction],
 			modeString,
 			progress,
 			nextProgress,
-			actualValue
+			actualValue,
+			answer.steps.size()
 			);
 
 		// フォーマット適用
