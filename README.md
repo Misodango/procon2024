@@ -1,12 +1,10 @@
 # procon35 登録番号 30013 ゴリゴリズム2.0.0
 
 # 概要
-- これは、第34回全国高等専門学校プログラミングコンテスト 競技部門のために開発されたソフトウェアです。
-- ボードゲームAIであるAlpha Zeroを参考にしており、モンテカルロ木探索とニューラルネットワークを駆使して勝利を目指します。
-- 大きく分けて、「盤面管理統合ソフト」と「盤面価値評価ニューラルネットワーク」によって構成されています。
-- 言語としてC++とpythonを用いており、Visual Studio上で完結します。
+- これは、第35回全国高等専門学校プログラミングコンテスト 競技部門のために開発されたソフトウェアです。
+- 言語としてC++を用いており、Visual Studio上で完結します。
 
-# installation
+# installation(メンバー向け)
 
 visual studio上からこのレポジトリをクローンし、siv3dのパスを通してください。
 
@@ -24,10 +22,9 @@ App下のディレクトリの置換とリビルドを忘れずに！
 
 # 盤面管理統合ソフト
 競技サーバーとのHTTP通信、データの管理、データの表示、職人の行動決定をすることが出来るソフトウェアです。
-- [Player](Procon2023/Player/Main.cpp)
+- [Main.cpp](Main.cpp)
   - 試合全体の処理の流れが書いてあります。
-  - main関数のような立ち位置のプロジェクトです。
-- [Player(enemy)](Procon2023/Player(enemy)/Main.cpp)
+- [](Procon2023/Player(enemy)/Main.cpp)
   - 1台のPCで対戦をする際に、Playerと同時に実行するプロジェクトです。
   - 本番では使用しません。
 - [Player(training)](Procon2023/Player(training)/Main.cpp), [Player(enemy)(training)](Procon2023/Player(enemy)(training)/Main.cpp)
@@ -53,15 +50,6 @@ App下のディレクトリの置換とリビルドを忘れずに！
   - 本番では、ここに書かれたメソッドの中から一つを選んで使用します。
 
 
-# 盤面価値評価ニューラルネットワーク
-盤面価値評価ニューラルネットワークを訓練するプログラムをvalue_network_trainingに示します。
-value_network_trainingは3つのプログラム、1つのフォルダ、1つの学習済みデータによって構成されています。本番では学習済みデータのみを使用します。
-- [A11_sig](value_network_training/A11_sig)
-  - 大量の対戦データが格納されたフォルダです。各ターンごとの行動をjsonで保存しています。
-- [my_regression_model.h5](value_network_training/my_regression_model.h5)
-  - lenet_2.pyを用いて学習されたデータです。
-- [json_read.py](value_network_training/json_read.py)
-  - A11_sigに格納された大量の対戦データをjsonから読み取り、学習を行うことの出来るデータフォーマットに変換するプログラムです。
 - [lenet_2.py](value_network_training/lenet_2.py)
   - 大量の対戦データから盤面価値を計算するニューラルネットワークを学習するプログラムです。畳み込みニューラルネットワークの一つであるlenetを改良したものとなっています。
 - [try_model.py](value_network_training/try_model.py)
