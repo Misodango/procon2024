@@ -114,12 +114,13 @@ void drawColorSample() {
 	}
 }
 
-void patternDraw(const Array<Pattern>& patterns, int currentPattern, const int cellSize, const Point& patternPos) {
+void patternDraw(const Array<Pattern>& patterns, int currentPattern, const int cellSize, const Point& patternPos, const GameMode& currentMode) {
+	if (currentMode != GameMode::Manual) return;
 	for (int32 y = 0; y < patterns[currentPattern].grid.height(); ++y) {
 		for (int32 x = 0; x < patterns[currentPattern].grid.width(); ++x) {
 			if (patterns[currentPattern].grid[y][x] == 1) {
 				Rect((patternPos.x + x) * cellSize, (patternPos.y + y) * cellSize, cellSize)
-					.draw(ColorF(1.0, 0.0, 0.0, 0.5));
+					.draw(ColorF(1.0, 1.0, 0.0, 0.5));
 			}
 		}
 	}
@@ -232,7 +233,7 @@ void Main() {
 			if (resetConfirmationCount == 10) {
 				resetConfirmationCount = 0;
 				// ファイルから読む
-				// board = initializeFromJSON(U"input.json").first;
+				//board = initializeFromJSON(U"input.json").first;
 
 				// getする
 				board = initializeFromGet(getUrl, token, U"input.json").first;
@@ -265,7 +266,7 @@ void Main() {
 					// 次のステップのプレビューを表示
 					if (currentStep < answer.steps.size()) {
 						const auto& [pattern, point, direction] = answer.steps[currentStep];
-						patternDraw(patterns, pattern.p, cellSize, point);
+						patternDraw(patterns, pattern.p, cellSize, point, currentMode);
 					}
 
 					// 「次へ」ボタンの描画
@@ -283,6 +284,8 @@ void Main() {
 							const auto& [pattern, point, direction] = answer.steps[currentStep];
 							replayBoard.apply_pattern(pattern, point, direction);
 							currentStep++;
+							replayBoard.draw();
+							System::Update();
 						}
 					}
 
@@ -312,7 +315,6 @@ void Main() {
 
 		// 人力の入力処理
 		if (currentMode == GameMode::Manual) {
-
 			// マウス入力のオンオフを切り替え
 			if (KeyM.down()) {
 				readMouseInput ^= 1;
@@ -345,6 +347,7 @@ void Main() {
 					nextProgress = 100.0 * board.calculateNextProgress(patterns[currentPattern], patternPos, direction) / double(board.height * board.width);
 				}
 			}
+
 		}
 		else {
 
@@ -380,12 +383,6 @@ void Main() {
 		}
 		// 描画
 		board.draw();
-
-		// 現在の抜き型を描画
-		if (GameMode::Manual) {
-			patternDraw(patterns, currentPattern, cellSize, patternPos);
-		}
-
 
 		// モード切り替えボタンの描画と処理
 		manualButton.draw(currentMode == GameMode::Manual ? buttonColor : white);
@@ -435,6 +432,7 @@ void Main() {
 
 		// 色見本表示
 		drawColorSample();
+		patternDraw(patterns, currentPattern, cellSize, patternPos, currentMode);
 
 		// 不正なサイズ
 		// 問題が読み取れていない場合はサイズが１になる

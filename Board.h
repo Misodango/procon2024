@@ -1,23 +1,40 @@
 ﻿#pragma once
 // Board.hpp
 
+/*
+*  このクラスはビジュアライザ用のクラスです。
+*  問題を解くときには Algorithm.cppにある `OptimizedBoard`を使用します。
+*/
+
+
 #include <Siv3D.hpp>
 #include "Pattern.h"
 
 class Board {
 public:
+
+	// 現在の盤面
 	Grid<int32> grid;
+
+	// 目的の盤面
 	Grid<int32> goal;
+
+	// サイズ
 	int32 width, height;
-	bool highlghtedByNum = 0;
+
+	// 初期化
 	Board(int32 w, int32 h);
 
+	// JSONで初期化
 	static Board fromJSON(const JSON& json);
 
+	// ゴール判定
 	bool is_goal() const;
 
+	// 抜き型の適用
 	void apply_pattern(const Pattern& pattern, Point pos, int32 direction);
 
+	// siv3dへの描画
 	void draw() const;
 
 	// ゴール状態との差異を計算
@@ -33,36 +50,24 @@ public:
 	bool operator==(const Board& other) const;
 	bool operator!=(const Board& other) const;
 
-	int32 calculateDifferenceByRow(int32 row, const Grid<int32>& otherGrid) const;
-	bool isRowMatched(int32 row, const Grid<int32>& otherGrid) const;
-
-	int32 calculateAdvancedDifference(const Grid<int32>& otherGrid) const;
-	int32 calculateAdvancedDifferenceByRow(int32 row, const Grid<int32>& otherGrid) const;
-
-	// 部分グリッドを取得
-	//  sy, sxを左上始点に直す
-	Grid<int32> partialGrid(int32 sy, int32 sx) const;
-	Grid<int32> partialGoal(int32 sy, int32 sx) const;
-
-
-	Point BFS(Point start, int32 target) const;
-	Point BFSbyPopcount(Point start, int32 target) const;
-	std::vector<std::pair<int32, int32>> sortToMatchPartially(int32 targetRow) const;
-
+	// 任意の抜き型を適用した時の盤面全体のゴールとの差異
+	// 実際には適用しない
 	int32 calculateNextDifference(const Pattern& pattern, Point pos, int32 direction) const;
 
+	// 任意の抜き型を適用した時の期待値
 	int32 calculateNextProgress(const Pattern& pattern, Point pos, int32 direction) const;
 
 
 private:
+	// 上下左右への適用
 	void shift_up(const Grid<bool>& isRemoved);
 	void shift_down(const Grid<bool>& isRemoved);
 	void shift_left(const Grid<bool>& isRemoved);
 	void shift_right(const Grid<bool>& isRemoved);
-	int32 calculateDistance(int32 x1, int32 y1, int32 x2, int32 y2) const;
 
 };
 
+// ハッシュ関数
 namespace std {
 	template <>
 	struct hash<Board> {

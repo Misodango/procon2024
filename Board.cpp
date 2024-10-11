@@ -5,7 +5,7 @@
 
 Board::Board(int32 w, int32 h) : width(w), height(h), grid(w, h, 0), goal(w, h, 0) {}
 
-
+// JSONから初期化
 Board Board::fromJSON(const JSON& json) {
 	Console << json;
 	const int32 width = json[U"width"].get<int32>();
@@ -35,6 +35,7 @@ Board Board::fromJSON(const JSON& json) {
 	return board;
 }
 
+// ゴールかどうか
 bool Board::is_goal() const {
 	return grid == goal;
 }
@@ -53,6 +54,7 @@ int32 Board::calculateDifference(const Grid<int32>& otherGrid) const {
 	return diff;
 }
 
+// 抜き型の適用
 void Board::apply_pattern(const Pattern& pattern, Point pos, int32 direction) {
 	// Array<Point> removed_cells;
 	Grid<bool> isRemoved(width, height, 0);
@@ -90,6 +92,7 @@ Board Board::applyPatternCopy(const Pattern& pattern, Point pos, int32 direction
 	return newBoard;
 }
 
+// siv3dのUIに描画
 void Board::draw() const {
 
 	const int32 cellSize = Min(1024 / grid.width(), 1024 / grid.height());
@@ -123,6 +126,7 @@ void Board::draw() const {
 
 }
 
+// 上向き適用
 void Board::shift_up(const Grid<bool>& isRemoved) {
 	for (int32 x = 0; x < width; ++x) {
 		Array<int32> column;
@@ -147,6 +151,7 @@ void Board::shift_up(const Grid<bool>& isRemoved) {
 	}
 }
 
+// 下向き適用
 void Board::shift_down(const Grid<bool>& isRemoved) {
 	for (int32 x = 0; x < width; ++x) {
 		Array<int32> column;
@@ -172,6 +177,7 @@ void Board::shift_down(const Grid<bool>& isRemoved) {
 	}
 }
 
+// 左向き適用
 void Board::shift_left(const Grid<bool>& isRemoved) {
 	for (int32 y = 0; y < height; ++y) {
 		Array<int32> row;
@@ -197,6 +203,7 @@ void Board::shift_left(const Grid<bool>& isRemoved) {
 	}
 }
 
+// 右向き適用
 void Board::shift_right(const Grid<bool>& isRemoved) {
 	for (int32 y = 0; y < height; ++y) {
 		Array<int32> row;
@@ -222,7 +229,7 @@ void Board::shift_right(const Grid<bool>& isRemoved) {
 	}
 }
 
-
+// ハッシュ関数
 size_t Board::hash() const {
 	size_t seed = 0;
 	for (int32 y = 0; y < height; ++y) {
@@ -234,263 +241,18 @@ size_t Board::hash() const {
 	return seed;
 }
 
-
+// 一致
 bool Board::operator==(const Board& other) const {
 	return grid == other.grid;
 }
 
+// 不一致
 bool Board::operator!=(const Board& other) const {
 	return !(*this == other);
 }
 
-int32 Board::calculateDifferenceByRow(int32 row, const Grid<int32>& otherGrid) const {
-	int32 diff = 0;
-	for (int32 x = 0; x < width; ++x) {
-		if (otherGrid[row][x] != goal[row][x]) {
-			diff++;
-		}
-	}
-	return diff;
-}
-
-bool Board::isRowMatched(int32 row, const Grid<int32>& otherGrid) const {
-	for (int32 x = 0; x < width; ++x) {
-		if (otherGrid[row][x] != goal[row][x]) {
-			return false;
-		}
-	}
-	return true;
-}
-
-int32 Board::calculateDistance(int32 x1, int32 y1, int32 x2, int32 y2) const {
-	return std::abs(x1 - x2) + std::abs(y1 - y2);  // マンハッタン距離
-}
-
-int32 Board::calculateAdvancedDifference(const Grid<int32>& otherGrid) const {
-	int32 totalDiff = 0;
-	for (int32 y = 0; y < height; ++y) {
-		totalDiff += calculateAdvancedDifferenceByRow(y, otherGrid);
-	}
-	Console << U"advenced Diff : " << totalDiff;
-	return totalDiff;
-}
-
-int32 Board::calculateAdvancedDifferenceByRow(int32 row, const Grid<int32>& otherGrid) const {
-	int32 rowDiff = 0;
-	for (int32 x = 0; x < width; ++x) {
-		if (otherGrid[row][x] != goal[row][x]) {
-			int32 minDistance = std::numeric_limits<int32>::max();
-			for (int32 gy = 0; gy < height; ++gy) {
-				for (int32 gx = 0; gx < width; ++gx) {
-					if (goal[gy][gx] == otherGrid[row][x]) {
-						int32 distance = calculateDistance(x, row, gx, gy);
-						minDistance = std::min(minDistance, distance);
-					}
-				}
-			}
-			rowDiff += minDistance;
-		}
-	}
-	Console << U"adv Row Diff : " << rowDiff;
-	return rowDiff;
-}
-
-
-Grid<int32> Board::partialGrid(int32 sy, int32 sx) const {
-	Grid<int32> partialGrid(width - sx, height - sy);
-	Console << height - sy << U", " << width - sx;
-	for (int32 i = sy; i < height; i++) {
-		for (int32 j = sx; j < width; j++) {
-			partialGrid[i - sy][j - sx] = grid[i][j];
-			Console << i - sy << U", " << j - sx;
-		}
-	}
-	return partialGrid;
-}
-
-Grid<int32> Board::partialGoal(int32 sy, int32 sx) const {
-	Grid<int32> partialGoal(width - sx, height - sy);
-	Console << height - sy << U", " << width - sx;
-	for (int32 i = sy; i < height; i++) {
-		for (int32 j = sx; j < width; j++) {
-			partialGoal[i - sy][j - sx] = goal[i][j];
-			Console << i - sy << U", " << j - sx;
-		}
-	}
-	return partialGoal;
-}
-
-Point Board::BFS(Point start, int32 target) const {
-	int32 sy = start.y, sx = start.x;
-	Point pos = start;
-	int32 minDist = 1e9;
-	std::queue<Point> que;
-	que.push(Point(sx, sy));
-	Grid<int32> dist(grid.height(), grid.width(), -1);
-	int32 dy[] = { 1, 0, -1, 0 }, dx[] = { 0, 1, 0, -1 };
-	dist[sy][sx] = 0;
-	while (!que.empty()) {
-		Point nextPos = que.front();
-		que.pop();
-		int32 y = nextPos.y, x = nextPos.x;
-
-		Console << nextPos;
-
-		for (int32 i : step(4)) {
-			int32 ny = dy[i] + y, nx = dx[i] + x;
-			// Console << U"ny, nx:" << ny << U",  " << nx;
-			if (ny < 0 || ny >= grid.height() || nx < 0 || nx >= grid.width()) continue;
-			if (dist[ny][nx] != -1) continue;
-
-			dist[ny][nx] = dist[y][x] + 1;
-			// Console << U"dist::" << dist[ny][nx];
-			que.push(Point(nx, ny));
-
-			if (goal[sy][sx] == grid[ny][nx] && grid[ny][nx] != goal[ny][nx]) {
-				return Point(nx, ny);
-				if (minDist > dist[ny][nx]) {
-					minDist = dist[ny][nx];
-					pos = Point(nx, ny);
-				}
-			}
-
-		}
-	}
-	// Console << U"dist: " << dist;
-	return pos;
-}
-
-Point Board::BFSbyPopcount(Point start, int32 target) const {
-	int32 sy = start.y, sx = start.x;
-	Point best = Point(-1, -1);
-
-	static Grid<int32> distances(width * height, width * height);
-	static Grid<Array<std::pair<int32, Point>>> sortedDistances(width, height); // (sy, sx) に近いものを順に入れたい
-
-	static bool initialized;
-	if (sortedDistances.width() != width || sortedDistances.height() != height) {
-		distances = Grid<int32>(width * height, width * height);
-		sortedDistances = Grid<Array<std::pair<int32, Point>>>(width, height);
-		initialized = false;
-	}
-	if (initialized) {
-		// Console << U"calculated";
-	}
-	else {
-
-		for (int32 y1 : step(height)) {
-			Console << U"y1: " << y1;
-			for (int32 x1 : step(width)) {
-				for (int32 y2 : step(height)) {
-					for (int32 x2 : step(width)) {
-						int32 dx = x1 - x2;
-						int32 dy = y1 - y2;
-						int32 dist = std::popcount(static_cast<uint32>(Abs(dx))) + std::popcount(static_cast<uint32>(Abs(dy)));
-						// int32 dist = std::popcount(static_cast<uint32>(Abs(dx))) + (dy > 0); // yに関して，1手で変更可能
-						if (dist == 0) continue;
-						if (abs(dx) + abs(dy) == 1) dist += 2; // 大きいものを使いたい
-						// Point(y1, x1) -> int32
-						distances[y1 * width + x1][y2 * width + x2] = dist;
-						// sortedDistances[y1][x1].push_back({ dist, Point(x2, y2) });
-						sortedDistances[y1][x1].emplace_back(std::pair(dist, Point(x2, y2)));
-					}
-				}
-
-				// static Grid<Array<std::pair<int32, Point>>> sortedDistances(width, height);
-				std::sort(sortedDistances[y1][x1].begin(), sortedDistances[y1][x1].end(), [&](const auto& a, const auto& b) {
-
-					return a.first < b.first;
-					});
-
-
-			}
-		}
-
-
-		initialized = true;
-	}
-
-	for (const auto& p : sortedDistances[sy][sx]) {
-		const auto& x = p.second.x, & y = p.second.y;
-		if (grid[y][x] == target && grid[y][x] != goal[y][x]) {
-			// return p.second;
-			best = Point(x, y);
-			break;
-		}
-	}
-
-
-
-	/* 愚直
-	for (int32 y : step(height)) {
-		for (int32 x : step(width)) {
-			if (grid[y][x] == target && grid[y][x] != goal[y][x]) {
-				uint32 dy = AbsDiff(y, sy), dx = AbsDiff(x, sx);
-				int32 pcount = std::popcount(dx) + std::popcount(dy);
-				if (dist > pcount) {
-					best = Point(x, y);
-					dist = pcount;
-				}
-			}
-		}
-	}
-	*/
-	return best;
-}
-
-std::vector<std::pair<int32, int32>> Board::sortToMatchPartially(int32 targetRow)const {
-	Array<int32> A(width), B(width);
-	for (int32 i : step(width)) {
-		A[i] = grid[targetRow][i];
-		B[i] = goal[targetRow][i];
-	}
-	std::vector<std::pair<int32, int32>> swaps;
-	std::unordered_map<int32, int32> countA, countB;
-
-	// 各要素の出現回数をカウント
-	for (int32 num : A) countA[num]++;
-	for (int32 num : B) countB[num]++;
-
-	// 第1段階: 共通要素を正しい位置に配置
-	for (int32 i = 0; i < A.size(); ++i) {
-		if (A[i] != B[i] && countA[B[i]] > 0) {
-			for (int32 j = i + 1; j < A.size(); ++j) {
-				if (A[j] == B[i]) {
-					swaps.emplace_back(i, j);  // インデックスを記録
-					std::swap(A[i], A[j]);
-					break;
-				}
-			}
-		}
-		if (countA[B[i]] > 0) countA[B[i]]--;
-	}
-
-	// 第2段階: 残りの要素をできるだけBの順序に近づける
-	std::vector<int32> remainingB;
-	for (int32 num : B) {
-		if (countB[num] > 0) {
-			remainingB.push_back(num);
-			countB[num]--;
-		}
-	}
-
-	int32 j = 0;
-	for (int32 i = 0; i < A.size(); ++i) {
-		if (std::find(B.begin(), B.end(), A[i]) == B.end()) {
-			while (j < remainingB.size() && std::find(A.begin(), A.end(), remainingB[j]) != A.end()) {
-				j++;
-			}
-			if (j < remainingB.size()) {
-				swaps.emplace_back(i, -1);  // -1は新しい値を示す特別なインデックス
-				A[i] = remainingB[j];
-				j++;
-			}
-		}
-	}
-
-	return swaps;
-}
-
+// 任意の抜き型を適用した時の盤面全体のゴールとの差異
+// 実際には適用しない
 int32 Board::calculateNextDifference(const Pattern& pattern, Point pos, int32 direction) const {
 	Board newBoard = this->applyPatternCopy(pattern, pos, direction);
 	int32 diff = 0;
@@ -504,6 +266,7 @@ int32 Board::calculateNextDifference(const Pattern& pattern, Point pos, int32 di
 	return diff;
 }
 
+// 任意の抜き型を適用した時の盤面の期待値
 int32 Board::calculateNextProgress(const Pattern& pattern, Point pos, int32 direction) const {
 	return height * width - calculateNextDifference(pattern, pos, direction);
 }
