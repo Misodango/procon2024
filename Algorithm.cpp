@@ -6,96 +6,39 @@ namespace Algorithm {
 
 	class OptimizedBoard {
 	private:
+		// 盤面の1次元表現
 		std::vector<uint64_t> grid;
 		std::vector<uint64_t> goal;
 		std::vector<uint64_t> temp_grid;
+
+		// 64bitに2bitごとに入れるので64/2 = 32bit
 		static constexpr int CELLS_PER_UINT64 = 32;
+
+		// 2bitごとに1次元に直すので"11"でandをとる
 		static constexpr uint64_t MASK = 0x3; // 11 in binary
 
+		// 座標変換
 		int calculateIndex(int x, int y) const {
 			return y * width + x;
 		}
 
-		// Helper function to calculate popcount
+		// ポップカウント
 		int popcount(int n) const {
 			// return std::popcount(static_cast<unsigned>(n));
 			return std::popcount(static_cast<uint32_t>(n));
 			// return __builtin_popcount(n);
 		}
 
+		// Y座標変換
 		int getYFromIndex(int index) const {
 			return index / width;
 		}
 
-		int estimateStepEffectFast(const Pattern& pattern, Point pos, int direction, int& lastCorrectX, int& lastCorrectY) const {
-			int effect = 0;
-
-			// パターンの適用位置が最後の正解位置より前なら、効果はほぼないと考える
-			if (pos.y < lastCorrectY || (pos.y == lastCorrectY && pos.x < lastCorrectX)) {
-				return 0;
-			}
-
-			// パターンのサイズに基づいて、影響を受ける可能性のある正解セルの数を推定
-			int affectedCells = pattern.grid.width() * pattern.grid.height();
-
-			switch (direction) {
-			case 0: // up
-				effect = estimateVerticalShiftEffect(pos, -affectedCells, lastCorrectY);
-				break;
-			case 1: // down
-				effect = estimateVerticalShiftEffect(pos, affectedCells, lastCorrectY);
-				break;
-			case 2: // left
-				effect = estimateHorizontalShiftEffect(pos, -affectedCells, lastCorrectX, lastCorrectY);
-				break;
-			case 3: // right
-				effect = estimateHorizontalShiftEffect(pos, affectedCells, lastCorrectX, lastCorrectY);
-				break;
-			}
-
-			// 最後の正解位置を更新
-			lastCorrectY += effect / width;
-			lastCorrectX = (lastCorrectX + effect) % width;
-
-			return effect;
-		}
-
-		int estimateVerticalShiftEffect(Point pos, int shift, int lastCorrectY) const {
-			int effect = 0;
-			int startY = std::max(lastCorrectY, pos.y);
-			int endY = std::min(height - 1, pos.y + abs(shift));
-
-			for (int y = startY; y <= endY; ++y) {
-				if (getGrid(pos.x, y) == getGoal(pos.x, y + shift)) {
-					effect++;
-				}
-				else if (getGrid(pos.x, y) == getGoal(pos.x, y)) {
-					effect--;
-				}
-			}
-
-			return effect;
-		}
-
-		int estimateHorizontalShiftEffect(Point pos, int shift, int lastCorrectX, int lastCorrectY) const {
-			int effect = 0;
-			int startX = (pos.y == lastCorrectY) ? std::max(lastCorrectX, pos.x) : pos.x;
-			int endX = std::min(width - 1, pos.x + abs(shift));
-
-			for (int x = startX; x <= endX; ++x) {
-				if (getGrid(x, pos.y) == getGoal(x + shift, pos.y)) {
-					effect++;
-				}
-				else if (getGrid(x, pos.y) == getGoal(x, pos.y)) {
-					effect--;
-				}
-			}
-
-			return effect;
-		}
-
 	public:
+		// サイズ
 		int width, height;
+
+		// 初期化
 		OptimizedBoard(int w, int h) : width(w), height(h) {
 			int cellCount = width * height;
 			int uint64Count = (cellCount + CELLS_PER_UINT64 - 1) / CELLS_PER_UINT64;
@@ -125,8 +68,10 @@ namespace Algorithm {
 			goal = go;
 		}
 
+		// 比較関数
 		bool operator==(const OptimizedBoard& other) const { return grid == other.grid; };
 
+		// 現在の盤面の個々の値を設定
 		void set(int x, int y, int value) {
 			int index = y * width + x;
 			int arrayIndex = index / CELLS_PER_UINT64;
@@ -137,6 +82,7 @@ namespace Algorithm {
 				(static_cast<uint64_t>(value) << bitIndex);
 		}
 
+		// ゴール盤面の個々の値を設定
 		void _set(int x, int y, int value) {
 			int index = y * width + x;
 			int arrayIndex = index / CELLS_PER_UINT64;
@@ -147,6 +93,7 @@ namespace Algorithm {
 				(static_cast<uint64_t>(value) << bitIndex);
 		}
 
+		// 現在の盤面上の値を取得
 		int getGrid(int x, int y) const {
 			if (x >= width || y >= height)return -1;
 			int index = y * width + x;
@@ -156,6 +103,7 @@ namespace Algorithm {
 			return (grid[arrayIndex] >> bitIndex) & MASK;
 		}
 
+		// ゴール盤面上の値を取得
 		int getGoal(int x, int y) const {
 			if (x >= width || y >= height)return -1;
 			int index = y * width + x;
@@ -165,6 +113,7 @@ namespace Algorithm {
 			return (goal[arrayIndex] >> bitIndex) & MASK;
 		}
 
+		// グリッドを一度に設定
 		void setGrid(const Grid<int>& grid) {
 			for (int i : step(grid.height())) {
 				for (int j : step(grid.width())) {
@@ -173,6 +122,7 @@ namespace Algorithm {
 			}
 		}
 
+		// ゴールを一度に設定
 		void setGoal(const Grid<int>& goal) {
 			for (int i : step(goal.height())) {
 				for (int j : step(goal.width())) {
@@ -181,6 +131,7 @@ namespace Algorithm {
 			}
 		}
 
+		// コンソールデバッグ用
 		void print() {
 			Grid<int> grid(width, height), goal(width, height);
 			for (int i = 0; i < height; i++) {
@@ -195,6 +146,7 @@ namespace Algorithm {
 
 		}
 
+		// 上向き適用
 		void shift_up(const std::vector<bool>& isRemoved) {
 			std::fill(temp_grid.begin(), temp_grid.end(), 0);
 			for (int x = 0; x < width; ++x) {
@@ -223,6 +175,7 @@ namespace Algorithm {
 			std::swap(grid, temp_grid);
 		}
 
+		// 下向き適用
 		void shift_down(const std::vector<bool>& isRemoved) {
 			std::fill(temp_grid.begin(), temp_grid.end(), 0);
 			for (int x = 0; x < width; ++x) {
@@ -251,6 +204,7 @@ namespace Algorithm {
 			std::swap(grid, temp_grid);
 		}
 
+		// 左向き適用
 		void shift_left(const std::vector<bool>& isRemoved) {
 			std::fill(temp_grid.begin(), temp_grid.end(), 0);
 			for (int y = 0; y < height; ++y) {
@@ -279,6 +233,7 @@ namespace Algorithm {
 			std::swap(grid, temp_grid);
 		}
 
+		// 右向き適用
 		void shift_right(const std::vector<bool>& isRemoved) {
 			std::fill(temp_grid.begin(), temp_grid.end(), 0);
 			for (int y = 0; y < height; ++y) {
@@ -307,6 +262,7 @@ namespace Algorithm {
 			std::swap(grid, temp_grid);
 		}
 
+		// 適用
 		void apply_pattern(const Pattern& pattern, Point pos, int direction) {
 			std::vector<bool> isRemovedVector(width * height, 0);
 			for (int y = 0; y < pattern.grid.height(); ++y) {
@@ -337,6 +293,7 @@ namespace Algorithm {
 
 		}
 
+		// 盤面すべての揃っている個数のカウント
 		int getCorrectCountAll() const {
 			int count = 0;
 			for (size_t i = 0; i < grid.size(); ++i) {
@@ -355,7 +312,7 @@ namespace Algorithm {
 			return count;
 		}
 
-		// 何マスまで揃っているか
+		// 何マスまで揃っているかのカウント
 		int getCorrectCount() const {
 			int count = 0;
 			int totalCells = width * height;
@@ -382,17 +339,6 @@ namespace Algorithm {
 				}
 			}
 			return count;
-		}
-
-		int getCorrectCountByRow() const {
-			int res = 0;
-			for (int x : step(width)) {
-				for (int y : step(height)) {
-					if (getGrid(x, y) != getGoal(x, y)) return res;
-					res++;
-				}
-			}
-			return res;
 		}
 
 		//　任意の点から何マスまで揃っているか
@@ -435,6 +381,7 @@ namespace Algorithm {
 			return res;
 		}
 
+		// 任意のマス(x,y) = (a, b)と同じ値のマスで最も近い点
 		Point findClosestPointWithSameValue(int a, int b) const {
 			int targetValue = getGoal(a, b);
 			int targetIndex = calculateIndex(a, b);
@@ -465,7 +412,8 @@ namespace Algorithm {
 			}
 			return closestPoint;
 		}
-		// (x, y)
+
+		// 任意のマス(x, y) = (a, b)と同じ値かつY軸のポップカウントが1の点
 		std::vector<std::pair<int, int>> findPointsWithSameValueAndYPopcountDiff1(int a, int b) const {
 			int targetValue = getGoal(a, b);
 			std::vector<std::pair<int, int>> result;
@@ -494,7 +442,8 @@ namespace Algorithm {
 			return result;
 		}
 
-		// 走査したい行をしていできる
+		// 任意のマス(x, y) = (a, b)と同じ値かつY軸のポップカウントが1の点を期待値の高い順にソート
+		// 走査したい行を指定できる
 		// popcount(specificY - b) == 1である必要がある
 		std::vector<std::pair<int, int>> sortedFindPointsWithSameValueAndYPopcountDiff1(int a, int b, int specificY = -1) const {
 			int targetValue = getGoal(a, b);
@@ -568,53 +517,7 @@ namespace Algorithm {
 			return newBoard;
 		}
 
-		std::vector<std::tuple<int, int, int, int>> findBestMatchingSegmentInPopcountOneRows(int baseRow) const {
-			if (baseRow < 0 || baseRow >= height) {
-				throw std::out_of_range("Invalid row index");
-			}
-
-			std::vector<std::tuple<int, int, int, int>> results; // (rowY, startX, length, score)
-
-			for (int dy : {1, 2, 4, 8, 16, 32, 64, 128}) {
-				int targetRow = baseRow + dy;
-				if (targetRow >= height) break;
-
-				int bestStartX = 0;
-				int bestLength = 0;
-				int maxScore = 0;
-
-				for (int startX = 0; startX < width; ++startX) {
-					int length = 0;
-					int score = 0;
-					for (int i = 0; i < width; ++i) {
-						int x = (startX + i) % width;
-						if (getGrid(x, targetRow) == getGoal(i, baseRow)) {
-							length++;
-							score += width - i; // Give higher score to earlier matches
-						}
-						else {
-							break;
-						}
-					}
-					if (score > maxScore) {
-						maxScore = score;
-						bestStartX = startX;
-						bestLength = length;
-					}
-				}
-
-				if (bestLength > 0) {
-					results.emplace_back(targetRow, bestStartX, bestLength, maxScore);
-				}
-			}
-
-			// Sort results by score in descending order
-			std::sort(results.begin(), results.end(),
-					  [](const auto& a, const auto& b) { return std::get<3>(a) > std::get<3>(b); });
-
-			return results;
-		}
-
+		// 正解かどうか
 		bool isGoal()const {
 			// Console << getCorrectCountAll();
 			for (int i = 0; i < grid.size(); i++) {

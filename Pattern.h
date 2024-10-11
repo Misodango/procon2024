@@ -5,19 +5,25 @@
 
 class Pattern {
 public:
+	// 抜き型のグリッド表現
 	Grid<int32> grid;
+
+	// 抜き型の番号
 	int32 p;
+
+	// 抜き型の名称
 	String name;
 
+	// 初期化
 	Pattern(const Grid<int32>& g, const int32& num, const String& n = U"")
 		: grid(g), p(num), name(n) {}
 
+	// JSONから初期化
 	static Pattern fromJSON(const JSON& json) {
 		const int32 p = json[U"p"].get<int32>();
 		const int32 width = json[U"width"].get<int32>();
 		const int32 height = json[U"height"].get<int32>();
 		const String name = U"test";
-		// const String name = json[U"name"].getOr<String>(U"");
 
 		Grid<int32> grid(width, height, 0);
 		if (json[U"cells"].isArray()) {
@@ -42,6 +48,7 @@ public:
 		return Pattern(grid, p, name);
 	}
 
+	// siv3d用の描画
 	void draw(const Point& pos, int32 cellSize, const ColorF& color = Palette::Red) const {
 		for (int32 y = 0; y < grid.height(); ++y) {
 			for (int32 x = 0; x < grid.width(); ++x) {

@@ -54,10 +54,13 @@ namespace Algorithm {
 		}
 	};
 
+	// 貪欲
 	Solution greedy(const Board& initialBoard, const Array<Pattern>& patterns);
 
+	// ビームサーチ
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns);
 
+	// 貪欲を2行同時にやる
 	Solution greedy2(const Board& initialBoard, const Array<Pattern>& patterns);
 
 
