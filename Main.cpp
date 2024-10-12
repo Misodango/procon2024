@@ -126,6 +126,59 @@ void patternDraw(const Array<Pattern>& patterns, int currentPattern, const int c
 	}
 }
 
+void trainAndDebug(const Array<Pattern>& patterns) {
+	int trainStepSize = 500;
+	Array<int> failedStep;
+	for (int count : step(trainStepSize)) {
+		Board board(128, 128);
+		for (int i : step(128)) {
+			for (int j : step(128)) {
+				int value = Random<int>(4) % 4;
+				board.grid[i][j] = value;
+				board.goal[i][j] = value;
+			}
+		}
+		Array<int> values;
+		for (const auto& value : board.grid)
+		{
+			values << value;
+		}
+
+		values.shuffle();
+
+		auto it = values.begin();
+		for (auto& cell : board.grid)
+		{
+			cell = *it++;
+		}
+
+		auto solution = Algorithm::solve(Algorithm::Type::BeamSearch, board, patterns);
+		Console << U"step size:" << solution.steps.size();
+		// 移動方向割合の確認
+		Array<int> directionCount(4, 0);
+		for (const auto& action : solution.steps) {
+			const auto& [solvePattern, solvePos, solveDir] = action;
+			// answer.steps.emplace_back(action);
+			board.apply_pattern(solvePattern, solvePos, solveDir);
+			directionCount[solveDir]++;
+			/*board.draw();
+			System::Update();*/
+		}
+		Console << directionCount;
+
+		if (board.is_goal()) {
+			Console << U"step{}:clear"_fmt(count);
+		}
+		else {
+			failedStep.emplace_back(count);
+		}
+	}
+	Console << U"total {} failed {}%"_fmt(failedStep.size(), 100.0 * failedStep.size() / trainStepSize);
+	for (const auto& stepNum : failedStep) {
+		Console << U"step:{} failed"_fmt(stepNum);
+	}
+}
+
 void Main() {
 
 	//　シミュレータサイズ
@@ -209,6 +262,10 @@ void Main() {
 
 	while (System::Update()) {
 
+		/*if (KeyQ.down()) {
+			trainAndDebug(patterns);
+		}*/
+
 		// 人力モード
 		if (manualButton.leftClicked()) {
 			currentMode = GameMode::Manual;
@@ -280,12 +337,14 @@ void Main() {
 
 					// 「最後まで」ボタンの描画
 					if (SimpleGUI::Button(U"Skip to End", Vec2(BUTTON_X, 60))) {
+						bool replaySteps = 1;
 						while (currentStep < answer.steps.size()) {
 							const auto& [pattern, point, direction] = answer.steps[currentStep];
 							replayBoard.apply_pattern(pattern, point, direction);
 							currentStep++;
 							replayBoard.draw();
-							System::Update();
+							if (replaySteps) System::Update();
+							if (KeySpace.down()) replaySteps = 0;
 						}
 					}
 
@@ -367,8 +426,8 @@ void Main() {
 					answer.steps.emplace_back(action);
 					board.apply_pattern(solvePattern, solvePos, solveDir);
 					directionCount[solveDir]++;
-					board.draw();
-					System::Update();
+					/*board.draw();
+					System::Update();*/
 				}
 				Console << directionCount;
 
