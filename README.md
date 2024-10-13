@@ -15,6 +15,12 @@
 - 競技サーバーとのHTTP通信
 - リプレイ検証
 
+![image](https://github.com/user-attachments/assets/e458f444-dd42-4251-9636-b175f1a667d3)
+
+![Manual](https://img.shields.io/badge/Manual-blue?style=for-the-badge&logo=auto&logoColor=white)では、選択している抜き型に対応する領域が黄色くハイライトされます。
+![image](https://github.com/user-attachments/assets/3e215dfa-dc68-4479-bfe4-428eb6e88d0d)
+
+
 ### Board
 - [Board.h](./Board.h)
 - [Board.cpp](./Board.cpp)
@@ -56,6 +62,13 @@
 ## 注意事項
 - 競技サーバーとの通信にはインターネット接続が必要です
 - リプレイ機能を使用する際は、保存されたデータが必要になります
+
+## リプレイ機能
+![image](https://github.com/user-attachments/assets/da1f56b7-a670-4a46-b80e-45e47714f3dd)
+盤面が揃っている状態で![Auto](https://img.shields.io/badge/Auto-gray?style=for-the-badge&logo=auto&logoColor=gray)を押すと、1手ずつ検証することができます。
+![Skip to End](https://img.shields.io/badge/Skip_to_End-blue?style=for-the-badge&logo=auto&logoColor=white)は、連続するアニメーションとなります。
+途中でスペースキーをおすと、リプレイが止まります。
+
 
 # installation(メンバー向け)
 
