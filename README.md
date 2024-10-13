@@ -70,7 +70,7 @@
 途中でスペースキーをおすと、リプレイが止まります。
 
 
-# installation(メンバー向け)
+# installation
 
 visual studio上からこのレポジトリをクローンし、siv3dのパスを通してください。
 
@@ -83,3 +83,6 @@ visual studio上からこのレポジトリをクローンし、siv3dのパス�
 siv3dを最新版にしたら、[ここ](https://zenn.dev/link/comments/8aaf45fc5ae077)を参考に、設定をしてください。
 
 App下のディレクトリの置換とリビルドを忘れずに！
+
+![image](https://github.com/user-attachments/assets/8d5216b1-3d7f-461c-b52d-677aa16bf5da)
+
