@@ -126,6 +126,59 @@ void patternDraw(const Array<Pattern>& patterns, int currentPattern, const int c
 	}
 }
 
+void trainAndDebug(const Array<Pattern>& patterns) {
+	int trainStepSize = 1;
+	Array<int> failedStep;
+	for (int count : step(trainStepSize)) {
+		Board board(128, 128);
+		for (int i : step(128)) {
+			for (int j : step(128)) {
+				int value = Random<int>(4) % 4;
+				board.grid[i][j] = value;
+				board.goal[i][j] = value;
+			}
+		}
+		Array<int> values;
+		for (const auto& value : board.grid)
+		{
+			values << value;
+		}
+
+		values.shuffle();
+
+		auto it = values.begin();
+		for (auto& cell : board.grid)
+		{
+			cell = *it++;
+		}
+
+		auto solution = Algorithm::solve(Algorithm::Type::BeamSearch, board, patterns);
+		Console << U"step size:" << solution.steps.size();
+		// 移動方向割合の確認
+		Array<int> directionCount(4, 0);
+		for (const auto& action : solution.steps) {
+			const auto& [solvePattern, solvePos, solveDir] = action;
+			// answer.steps.emplace_back(action);
+			board.apply_pattern(solvePattern, solvePos, solveDir);
+			directionCount[solveDir]++;
+			/*board.draw();
+			System::Update();*/
+		}
+		Console << directionCount;
+
+		if (board.is_goal()) {
+			Console << U"step{}:clear"_fmt(count);
+		}
+		else {
+			failedStep.emplace_back(count);
+		}
+	}
+	Console << U"total {} failed {}%"_fmt(failedStep.size(), 100.0 * failedStep.size() / trainStepSize);
+	for (const auto& stepNum : failedStep) {
+		Console << U"step:{} failed"_fmt(stepNum);
+	}
+}
+
 void Main() {
 
 	//　シミュレータサイズ
@@ -208,7 +261,6 @@ void Main() {
 	Algorithm::Solution answer;
 
 	while (System::Update()) {
-
 		// 人力モード
 		if (manualButton.leftClicked()) {
 			currentMode = GameMode::Manual;
@@ -244,6 +296,7 @@ void Main() {
 				// 盤面サイズ初期化
 				cellSize = Min(BOARD_AREA_SIZE / board.width, BOARD_AREA_SIZE / board.height);
 
+
 				// 範囲外適用を避けるため抜き型座標を初期化
 				patternPos = Point(0, 0);
 			}
@@ -254,9 +307,9 @@ void Main() {
 			// 既に揃っていたらリプレイ
 			if (board.is_goal()) {
 				// get時に"input.json"に保存済み
-				board = initializeFromJSON(U"input.json").first;
+				// board = initializeFromJSON(U"input.json").first;
 				// リプレイ用の一時的な盤面
-				Board replayBoard = board;
+				Board replayBoard = initializeFromJSON(U"input.json").first;;
 				size_t currentStep = 0;
 
 				while (currentStep < answer.steps.size()) {
@@ -280,12 +333,18 @@ void Main() {
 
 					// 「最後まで」ボタンの描画
 					if (SimpleGUI::Button(U"Skip to End", Vec2(BUTTON_X, 60))) {
-						while (currentStep < answer.steps.size()) {
+						bool replaySteps = 1;
+						while (currentStep < answer.steps.size() && replaySteps) {
 							const auto& [pattern, point, direction] = answer.steps[currentStep];
 							replayBoard.apply_pattern(pattern, point, direction);
 							currentStep++;
 							replayBoard.draw();
 							System::Update();
+							if (KeySpace.down()) {
+								replaySteps = 0;
+								currentStep = answer.steps.size();
+								break;
+							}
 						}
 					}
 
@@ -296,7 +355,7 @@ void Main() {
 				}
 
 				// リプレイ終了後、実際のboardを更新
-				board = replayBoard;
+				// board = replayBoard;
 
 			}
 			else {
@@ -367,8 +426,8 @@ void Main() {
 					answer.steps.emplace_back(action);
 					board.apply_pattern(solvePattern, solvePos, solveDir);
 					directionCount[solveDir]++;
-					board.draw();
-					System::Update();
+					/*board.draw();
+					System::Update();*/
 				}
 				Console << directionCount;
 
