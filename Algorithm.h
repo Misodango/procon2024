@@ -38,19 +38,19 @@ namespace Algorithm {
 			output.save(U"output.json");
 			Console << U"Wrote ";
 			JSON submission;
-			try {
-				// submission = JSON::Load(U"output.json");
-				const FilePath path = FileSystem::FullPath(U"output.json");
-				Console << U"Full path: " << path;
-				JSON submission = JSON::Load(path);
-				if (not submission) {
-					throw Error(U"Failed to load JSON file");
-				}
-				Console << U"Loaded JSON: " << submission;
-			}
-			catch (const Error& error) {
-				Console << U"Error loading JSON: " << error.what();
-			}
+			//try {
+			//	// submission = JSON::Load(U"output.json");
+			//	const FilePath path = FileSystem::FullPath(U"output.json");
+			//	Console << U"Full path: " << path;
+			//	JSON submission = JSON::Load(path);
+			//	if (not submission) {
+			//		throw Error(U"Failed to load JSON file");
+			//	}
+			//	Console << U"Loaded JSON: " << submission;
+			//}
+			//catch (const Error& error) {
+			//	Console << U"Error loading JSON: " << error.what();
+			//}
 		}
 	};
 

@@ -1,6 +1,12 @@
 ﻿// Algorithm.cpp
 #include "Algorithm.h"
 #include <omp.h>
+#include <execution>
+#include <thread>
+#include <mutex>
+#include <algorithm>
+#include <atomic>
+
 
 namespace Algorithm {
 
@@ -469,6 +475,12 @@ namespace Algorithm {
 
 			auto calculateCount = [&](int sx, int sy, int nx, int ny) {
 				int dy = ny - sy;
+				if (dy == 0) {
+					for (int i = nx; i < width; i++) {
+						if (getGoal(i, sy) != getGrid(i, ny)) return i;
+					}
+					return nx - sx;
+				}
 				for (int i = 0; i < dy; i++) {
 					if (getGoal(sx + i, sy) != getGrid((nx + i) % width, ny)) return i;
 				}
@@ -478,7 +490,16 @@ namespace Algorithm {
 				};
 
 			if (specificY == -1) {
-				for (const int dy : { 1, 2, 4, 8, 16, 32, 64}) {
+				// dy = 0のとき
+				/*for (int dx : {1, 2, 4, 8, 16, 32, 64, 128}) {
+					if (a + dx >= width) break;
+					if (getGrid(a + dx, b) == targetValue) {
+						int count = calculateCount(a, b, a + dx, b);
+						int stepSize = 1;
+						result.emplace_back(a + dx, b, count);
+					}
+				}*/
+				for (const int dy : {1, 2, 4, 8, 16, 32, 64}) {
 					// if (dy == 1 && b < height - 2) continue;
 					int ny = b + dy;
 					if (ny >= height) break;
@@ -492,7 +513,7 @@ namespace Algorithm {
 					}
 				}
 			}
-			else if (specificY == 0) {
+			else if (specificY == b) {
 				// popcount(dx) = 1である必要がある
 				for (int dx : {1, 2, 4, 8, 16, 32, 64, 128}) {
 					if (a + dx >= width) break;
@@ -505,7 +526,10 @@ namespace Algorithm {
 			}
 			else {
 				int ny = specificY;
-				for (int x : step(width)) {
+				///*for (int x : step(width)) */{
+				for (int dx : {1, 2, 4, 8, 16, 32, 64, 128}) {
+					int x = a + dx;
+					if (x >= width) break;
 					if (getGrid(x, ny) == targetValue) {
 						int count = calculateCount(a, b, x, ny);
 						int stepSize = x == a ? 1 : 2;
@@ -521,16 +545,36 @@ namespace Algorithm {
 			// Convert sorted result to vector of pairs (x, y)
 			std::vector<std::pair<int, int>> sortedResult;
 			sortedResult.reserve(result.size());
-			float maxCount = 0;
+			float maxCount = -1;
 			for (const auto& [x, y, count] : result) {
 				maxCount = Max(maxCount, count);
-				if (specificY != 0 && count < maxCount) break;
+				if (count < maxCount) break;
 				sortedResult.emplace_back(x, y);
+			}
+
+			// dy = 0のとき
+			for (int dx : {1, 2, 4, 8, 16, 32, 64, 128}) {
+				if (a + dx >= width) break;
+				if (getGrid(a + dx, b) == targetValue) {
+					int count = calculateCount(a, b, a + dx, b);
+					int stepSize = 1;
+					sortedResult.emplace_back(a + dx, b);
+				}
 			}
 
 			return sortedResult;
 		}
 
+		// 任意のマス(x, y) = (a, b)と同じ値のマスで、同じ行にあるものを探す
+		// (a, b) より右にあるもの
+		std::vector<std::pair<int, int>> findPointsWithSameValueInSameRow(int a, int b) {
+			std::vector<std::pair<int, int>> result;
+			int targetValue = getGoal(a, b);
+			for (int x = a + 1; x < width; x++) {
+				if (getGrid(x, b) != targetValue) continue;
+				result.emplace_back(x, b);
+			}
+		}
 
 		// 特定の行を抜き出す
 		OptimizedBoard extractRow(int goalRow, int currentRow) const {
@@ -566,8 +610,7 @@ namespace Algorithm {
 		int correctCount = initialBoard.getCorrectCount();
 		int y = correctCount / width, x = correctCount % width;
 		// Console << U"start : " << Point(x, y);
-		const auto& candidates = (width * height > 32 * 32) ?
-			initialBoard.findPointsWithSameValueAndYPopcountDiff1(x, y) : initialBoard.sortedFindPointsWithSameValueAndYPopcountDiff1(x, y);
+		const auto& candidates = initialBoard.sortedFindPointsWithSameValueAndYPopcountDiff1(x, y);
 
 		solutions.reserve(candidates.size());
 		auto evaluateSolution = [](Solution sol, OptimizedBoard b) -> double {
@@ -585,11 +628,20 @@ namespace Algorithm {
 				solutionUsingType2.steps.emplace_back(pattern, Point(x, y), 0);
 				solutions.emplace_back(solutionUsingType2);
 			}
-			if (dx > 0) {
-				solution.steps.emplace_back(patterns[22], Point(candidate.first - x - 256, y + 1), 2);
+
+			if (dy == 0) {
+				const int bit = log2(dx);
+				const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+				solution.steps.emplace_back(pattern, Point(x, y), 2);
+				continue;
 			}
-			else if (dx < 0) {
-				solution.steps.emplace_back(patterns[22], Point(candidate.first + (width - x), y + 1), 3);
+			else {
+				if (dx > 0) {
+					solution.steps.emplace_back(patterns[22], Point(candidate.first - x - 256, y + 1), 2);
+				}
+				else if (dx < 0) {
+					solution.steps.emplace_back(patterns[22], Point(candidate.first + (width - x), y + 1), 3);
+				}
 			}
 			const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
 			solution.steps.emplace_back(pattern, Point(x, y), 0);
@@ -625,70 +677,6 @@ namespace Algorithm {
 		return solutions;
 	}
 
-	Solution sort(const OptimizedBoard& initialBoard, const Array<Pattern>& patterns, int sy, int ny) {
-		OptimizedBoard currentRow = initialBoard.extractRow(sy, ny);
-		Solution bestSolution;
-		int maxAligned = 0;
-
-		std::function<void(OptimizedBoard&, Solution&, int)> dfs = [&](OptimizedBoard& board, Solution& currentSolution, int depth) {
-			int aligned = board.getCorrectCount();
-			if (aligned > maxAligned || (aligned == maxAligned && currentSolution.steps.size() < bestSolution.steps.size())) {
-				maxAligned = aligned;
-				bestSolution = currentSolution;
-			}
-			Console << U"depth:" << depth;
-			if (depth >= 10 || board.isGoal()) return; // Limit depth to prevent excessive recursion
-
-			for (int x = 0; x < board.width; ++x) {
-				if (board.getGrid(x, 0) != board.getGoal(x, 0)) {
-					auto candidates = board.sortedFindPointsWithSameValueAndYPopcountDiff1(x, 0, 0);
-					for (const auto& [nx, _] : candidates) {
-						int dx = nx - x;
-						if (dx == 0) continue;
-
-						OptimizedBoard newBoard = board;
-						Solution newSolution = currentSolution;
-
-						// Apply horizontal shift
-						if (dx > 0) {
-							newBoard.apply_pattern(patterns[22], Point(dx - 256, 0), 2);
-							newSolution.steps.emplace_back(patterns[22], Point(dx - 256, ny), 2);
-						}
-						else {
-							newBoard.apply_pattern(patterns[22], Point(dx + board.width, 0), 3);
-							newSolution.steps.emplace_back(patterns[22], Point(dx + board.width, ny), 3);
-						}
-
-						dfs(newBoard, newSolution, depth + 1);
-					}
-					break; // Only process the first misaligned cell
-				}
-			}
-			};
-
-		OptimizedBoard boardCopy = currentRow;
-		Solution emptySolution;
-		dfs(boardCopy, emptySolution, 0);
-
-		// If ny > sy, try to align using vertical shifts
-		if (ny > sy) {
-			int dy = ny - sy;
-			for (int bit = 0; bit < 8; ++bit) {
-				if ((dy >> bit) & 1) {
-					const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-					OptimizedBoard newBoard = initialBoard;
-					Solution newSolution = bestSolution;
-					newBoard.apply_pattern(pattern, Point(0, sy), 0);
-					newSolution.steps.emplace_back(pattern, Point(0, sy), 0);
-
-					OptimizedBoard newRow = newBoard.extractRow(sy, sy);
-					dfs(newRow, newSolution, 0);
-				}
-			}
-		}
-
-		return bestSolution;
-	}
 
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns) {
 		const int32 height = initialBoard.height;
@@ -712,7 +700,7 @@ namespace Algorithm {
 				}
 			}
 			};
-		
+
 		OptimizedBoard board(width, height, initialBoard.grid, initialBoard.goal);
 
 		auto calculateScore = [](const OptimizedBoard& board, int stepCount) {
@@ -792,6 +780,7 @@ namespace Algorithm {
 				return bestState.solution;
 			};
 
+
 		auto startTime = std::chrono::high_resolution_clock::now();
 		Solution solution;
 		while (!board.isGoal()) {
@@ -805,6 +794,7 @@ namespace Algorithm {
 				board.apply_pattern(pattern, point, direction);
 				solution.steps.emplace_back(action);
 			}
+			Console << U"progress:" << board.getCorrectCount();
 			if (board.isGoal()) break;
 		}
 		auto currentTime = std::chrono::high_resolution_clock::now();
@@ -815,8 +805,8 @@ namespace Algorithm {
 
 	Solution beamSearchSort(const OptimizedBoard& initialBoard, const Array<Pattern>& patterns, int sy, int ny) {
 		if (ny >= initialBoard.height) return Solution();
-		const int beamWidth = 1000;
-		const int maxDepth = initialBoard.width / 4;  // 探索の深さを増やす
+		const int beamWidth = 500;
+		const int maxDepth = initialBoard.width / 2;  // 探索の深さを増やす
 
 		struct State {
 			OptimizedBoard board;
@@ -872,7 +862,9 @@ namespace Algorithm {
 
 				// まだ揃っていないマスから探索を開始
 				for (int x = continuousAligned; x < current.board.width; ++x) {
+					// auto candidates = current.board.findPointsWithSameValueInSameRow(x, 0);
 					auto candidates = current.board.sortedFindPointsWithSameValueAndYPopcountDiff1(x, 0, 0);
+					// Console << U"cand:" << candidates;
 					for (const auto& [nx, _] : candidates) {
 						int dx = nx - x;
 						if (dx == 0) continue;
@@ -892,7 +884,7 @@ namespace Algorithm {
 						}*/
 
 						int newAlignedCount = newBoard.getCorrectCount();
-						nextBeam.emplace(newBoard, newSolution, newAlignedCount);
+						nextBeam.emplace(newBoard, newSolution, double(newAlignedCount / newSolution.steps.size()));
 
 						if (nextBeam.size() > beamWidth) {
 							nextBeam.pop();
@@ -918,7 +910,7 @@ namespace Algorithm {
 					newBoard.apply_pattern(pattern, Point(0, sy), 0);
 					newSolution.steps.emplace_back(pattern, Point(0, sy), 0);
 
-					OptimizedBoard newRow = newBoard.extractRow(sy, sy);
+					OptimizedBoard newRow = newBoard.extractRow(ny, sy);
 					Solution rowSolution = beamSearchSort(newRow, patterns, sy, sy);
 
 					for (const auto& step : rowSolution.steps) {
@@ -950,26 +942,17 @@ namespace Algorithm {
 			int32 progress = board.getCorrectCount();
 			int32 sy = progress / board.width, sx = progress % board.width;
 			Console << U"sy:" << sy;
-
-			if (sy == board.height - 1) {
-				break;
-				Solution rowSortSolution = beamSearchSort(board, patterns, sy, sy);
-				for (const auto& action : rowSortSolution.steps) {
+			/*if (sx < 3) {
+				Solution rowSolution = beamSearchSort(board, patterns, sy, sy);
+				for (const auto& action : rowSolution.steps) {
 					const auto& [pattern, point, direction] = action;
 					board.apply_pattern(pattern, point, direction);
 					solution.steps.emplace_back(action);
-					// Console << U"pattern:{}, Point:{}, direction:{}"_fmt(pattern.p, point, direction);
 				}
-
-				progress = board.getCorrectCount();
 				sy = progress / board.width, sx = progress % board.width;
-			}
+			}*/
 			const auto& candidates = board.sortedFindPointsWithSameValueAndYPopcountDiff1(sx, sy);
 
-			/*if (candidates.empty()) {
-				const auto& temp = board.sortedFindPointsWithSameValue(sx, sy);
-				std::swap(candidates, temp);
-			}*/
 			Solution bestSolution;
 			double bestProgressDelta = 0;
 
@@ -978,19 +961,30 @@ namespace Algorithm {
 				// Console << U"nx, ny : " << Point(nx, ny);
 				Solution currentSolution;
 				const int32 dy = ny - sy, dx = nx - sx;
-				if (dx > 0) {
-					currentBoard.apply_pattern(patterns[22], Point(dx - 256, ny), 2);
-					currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, ny), 2);
-				}
-				else if (dx < 0) {
-					currentBoard.apply_pattern(patterns[22], Point(dx + board.width, ny), 3);
-					currentSolution.steps.emplace_back(patterns[22], Point(dx + board.width, ny), 3);
-				}
-				if (dy > 0) {
-					const int bit = log2(dy);
+
+				if (dy == 0) {
+					const int bit = log2(dx);
 					const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
-					currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
-					currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+					currentBoard.apply_pattern(pattern, Point(sx, sy), 2);
+					currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
+				}
+				else {
+					if (dx > 0) {
+						currentBoard.apply_pattern(patterns[22], Point(dx - 256, ny), 2);
+						currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, ny), 2);
+					}
+					else if (dx < 0) {
+						currentBoard.apply_pattern(patterns[22], Point(dx + board.width, ny), 3);
+						currentSolution.steps.emplace_back(patterns[22], Point(dx + board.width, ny), 3);
+					}
+
+
+					if (dy > 0) {
+						const int bit = log2(dy);
+						const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+						currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
+						currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+					}
 				}
 				if (currentSolution.steps.size() == 0) {
 					// Console << U"step size 0 " << Point(nx, ny);
@@ -1084,29 +1078,10 @@ namespace Algorithm {
 		// progressの差分/手数の最大
 		double score = -1;
 
-		//for (int bitDy : step(8)) {
-		//	int dy = (1 << bitDy);
-		//	if (sy + dy >= board.height) break;
-		//	Console << U"sy,ny:{},{}"_fmt(sy, sy + dy);
-		//	Solution rowSolution = beamSearchSort(board, patterns, sy, sy + dy);
-		//	// solution.steps.insert(solution.steps.end(), rowSolution.steps.begin(), rowSolution.steps.end());
-
-		//	OptimizedBoard updatedBoard = board;
-		//	for (const auto& [pattern, point, direction] : rowSolution.steps) {
-		//		updatedBoard.apply_pattern(pattern, point, direction);
-		//	}
-
-		//	double currentScore = (updatedBoard.getCorrectCount() - progress) / rowSolution.steps.size();
-		//	Console << U"cur score:{}, size:{}"_fmt(currentScore, rowSolution.steps.size());
-		//	if (currentScore > score) {
-		//		score = currentScore;
-		//		bestSolution = rowSolution;
-		//	}
-		//}
-
 		for (int y = sy; y < initialBoard.height; ++y) {
 			Console << U"y:" << y;
-			Solution rowSolution = beamSearchSort(board, patterns, y, y);
+			int ny = y;
+			Solution rowSolution = beamSearchSort(board, patterns, y, ny);
 			entireSolution.steps.insert(entireSolution.steps.end(), rowSolution.steps.begin(), rowSolution.steps.end());
 
 			// Apply the row solution to the board
@@ -1114,6 +1089,12 @@ namespace Algorithm {
 			for (const auto& [pattern, point, direction] : rowSolution.steps) {
 				updatedBoard.apply_pattern(pattern, point, direction);
 			}
+			/*if (ny != sy) {
+				int bit = log2(ny - sy);
+				const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+				updatedBoard.apply_pattern(pattern, Point(0, y), 0);
+				entireSolution.steps.emplace_back(pattern, Point(0, y), 0);
+			}*/
 			board = updatedBoard;
 			break;
 		}

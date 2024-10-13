@@ -127,7 +127,7 @@ void patternDraw(const Array<Pattern>& patterns, int currentPattern, const int c
 }
 
 void trainAndDebug(const Array<Pattern>& patterns) {
-	int trainStepSize = 500;
+	int trainStepSize = 1;
 	Array<int> failedStep;
 	for (int count : step(trainStepSize)) {
 		Board board(128, 128);
@@ -261,11 +261,6 @@ void Main() {
 	Algorithm::Solution answer;
 
 	while (System::Update()) {
-
-		/*if (KeyQ.down()) {
-			trainAndDebug(patterns);
-		}*/
-
 		// 人力モード
 		if (manualButton.leftClicked()) {
 			currentMode = GameMode::Manual;
@@ -301,6 +296,7 @@ void Main() {
 				// 盤面サイズ初期化
 				cellSize = Min(BOARD_AREA_SIZE / board.width, BOARD_AREA_SIZE / board.height);
 
+
 				// 範囲外適用を避けるため抜き型座標を初期化
 				patternPos = Point(0, 0);
 			}
@@ -311,9 +307,9 @@ void Main() {
 			// 既に揃っていたらリプレイ
 			if (board.is_goal()) {
 				// get時に"input.json"に保存済み
-				board = initializeFromJSON(U"input.json").first;
+				// board = initializeFromJSON(U"input.json").first;
 				// リプレイ用の一時的な盤面
-				Board replayBoard = board;
+				Board replayBoard = initializeFromJSON(U"input.json").first;;
 				size_t currentStep = 0;
 
 				while (currentStep < answer.steps.size()) {
@@ -338,13 +334,17 @@ void Main() {
 					// 「最後まで」ボタンの描画
 					if (SimpleGUI::Button(U"Skip to End", Vec2(BUTTON_X, 60))) {
 						bool replaySteps = 1;
-						while (currentStep < answer.steps.size()) {
+						while (currentStep < answer.steps.size() && replaySteps) {
 							const auto& [pattern, point, direction] = answer.steps[currentStep];
 							replayBoard.apply_pattern(pattern, point, direction);
 							currentStep++;
 							replayBoard.draw();
-							if (replaySteps) System::Update();
-							if (KeySpace.down()) replaySteps = 0;
+							System::Update();
+							if (KeySpace.down()) {
+								replaySteps = 0;
+								currentStep = answer.steps.size();
+								break;
+							}
 						}
 					}
 
@@ -355,7 +355,7 @@ void Main() {
 				}
 
 				// リプレイ終了後、実際のboardを更新
-				board = replayBoard;
+				// board = replayBoard;
 
 			}
 			else {
