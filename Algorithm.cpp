@@ -419,6 +419,21 @@ namespace Algorithm {
 			return closestPoint;
 		}
 
+		// 任意のマス(x, y) = (a, b)と同じ値のマス
+		std::vector<std::pair<int, int>> findPointsWithSameValue(int a, int b) const {
+			int target = getGoal(a, b);
+			std::vector<std::pair<int, int>> result;
+			for (int y = b; y < height; y++) {
+				for (int x = a; x < width; x++) {
+					if (target == getGrid(x, y)) {
+						result.emplace_back(x, y);
+					}
+				}
+			}
+			Console << U"res:" << result;
+			return result;
+		}
+
 		// 任意のマス(x, y) = (a, b)と同じ値のマスをpopcountでソート
 		std::vector<std::pair<int, int>> sortedFindPointsWithSameValue(int a, int b) const {
 			const int targetValue = getGoal(a, b);
@@ -650,30 +665,52 @@ namespace Algorithm {
 
 		if (!solutions.empty()) return solutions;
 
-		std::vector<int>targets;
-		int target = initialBoard.getGoal(x, y);
 
-		for (int32 nx = x + 1; nx < width; nx++) {
+		std::vector<std::pair<int, int>> targets;
+		int target = initialBoard.getGoal(x, y);
+		//　同じ行で探す
+		for (int nx = x; nx < width; nx++) {
 			if (initialBoard.getGrid(nx, y) == target) {
-				targets.emplace_back(nx);
+				targets.emplace_back(nx, y);
 			}
 		}
 
-		std::sort(targets.begin(), targets.end(), [&](int a, int b) {
-			return std::popcount(static_cast<unsigned>(a)) < std::popcount(static_cast<unsigned>(b));
-		});
-
-		for (const auto& gx : targets) {
+		// 別の行( popcountで差が1じゃない行)
+		for (int ny = y + 1; ny < height; ny++) {
+			for (int nx : step(width)) {
+				if (initialBoard.getGrid(nx, ny) != target) continue;
+				targets.emplace_back(nx, ny);
+			}
+		}
+		Console << U"targets size:" << targets.size();
+		for (const auto& [gx, gy] : targets) {
+			int dx = gx - x, dy = gy - y;
 			Solution solution;
+			if (dy > 0) {
+				if (dx > 0) {
+					solution.steps.emplace_back(patterns[22], Point(dx - 256, y + 1), 2);
+				}
+				else if (dx < 0) {
+					solution.steps.emplace_back(patterns[22], Point(gx + (width - x), y + 1), 3);
+				}
+				for (int bit : step(8)) {
+					if ((dy >> bit) & 1) {
+						const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+						solution.steps.emplace_back(pattern, Point(x, y), 0);
+					}
+				}
+				solutions.emplace_back(solution);
+				continue;
+			}
 			for (int bit : step(8)) {
-				if (((gx - x) >> bit) & 1) {
+				if ((dx >> bit) & 1) {
 					const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
 					solution.steps.emplace_back(pattern, Point(x, y), 2);
 				}
 			}
-			Console << U"size:" << solutions.size();
 			solutions.emplace_back(solution);
 		}
+		Console << U"current size:" << solutions.size();
 		return solutions;
 	}
 
@@ -942,15 +979,6 @@ namespace Algorithm {
 			int32 progress = board.getCorrectCount();
 			int32 sy = progress / board.width, sx = progress % board.width;
 			Console << U"sy:" << sy;
-			/*if (sx < 3) {
-				Solution rowSolution = beamSearchSort(board, patterns, sy, sy);
-				for (const auto& action : rowSolution.steps) {
-					const auto& [pattern, point, direction] = action;
-					board.apply_pattern(pattern, point, direction);
-					solution.steps.emplace_back(action);
-				}
-				sy = progress / board.width, sx = progress % board.width;
-			}*/
 			const auto& candidates = board.sortedFindPointsWithSameValueAndYPopcountDiff1(sx, sy);
 
 			Solution bestSolution;
@@ -997,59 +1025,61 @@ namespace Algorithm {
 				}
 			}
 
+			// 見つからなかったとき
 			if (bestSolution.steps.empty()) {
-				int32 target = board.getGoal(sx, sy);
-				progress = board.getCorrectCount();
-				for (int32 ny = sy; ny < board.height; ny++) {
-					for (int32 nx = sx; nx < board.width; nx++) {
-						/*for (int32 i = progress; i < board.height * board.width; i++) {*/
-						// int32 ny = i / board.width, nx = i % board.width;
+				std::vector<std::pair<int, int>> targets;
+				int target = board.getGoal(sx, sy);
+				//　同じ行で探す
+				for (int nx = sx; nx < board.width; nx++) {
+					if (board.getGrid(nx, sy) == target) {
+						targets.emplace_back(nx, sy);
+					}
+				}
+
+				// 別の行( popcountで差が1じゃない行)
+				for (int ny = sy + 1; ny < board.height; ny++) {
+					for (int nx : step(board.width)) {
 						if (board.getGrid(nx, ny) != target) continue;
-						OptimizedBoard currentBoard = board;
-						Solution currentSolution;
-						uint32 dy = ny - sy, dx = nx - sx;
-						// Console << U"nx, ny:" << Point(nx, ny);
-						// １行でも(nx, ny)と(sx, sy)に空き行があれば１手で横移動できる
-						if (dy > 1) {
-							if (dx > 0) {
-								currentBoard.apply_pattern(patterns[22], Point(dx - 256, ny), 2);
-								currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, ny), 2);
-							}
-							else if (dx < 0) {
-								currentBoard.apply_pattern(patterns[22], Point(dx + board.width, ny), 3);
-								currentSolution.steps.emplace_back(patterns[22], Point(dx + board.width, ny), 3);
-							}
-						}
-						else {
+						targets.emplace_back(nx, ny);
+					}
+				}
 
-							for (int bit : step(8)) {
-								if ((dx >> bit) & 1) {
-									const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
-									currentBoard.apply_pattern(pattern, Point(sx, sy), 2);
-									currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
-								}
-							}
+				for (const auto& [gx, gy] : targets) {
+					int dx = gx - sx, dy = gy - sy;
+					Solution currentSolution;
+					OptimizedBoard currentBoard = board;
+					if (dy > 0) {
+						if (dx > 0) {
+							currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, sy + 1), 2);
+							currentBoard.apply_pattern(patterns[22], Point(dx - 256, sy + 1), 2);
 						}
-
-						if (dy > 0)for (int bit : step(8)) {
+						else if (dx < 0) {
+							currentSolution.steps.emplace_back(patterns[22], Point(gx + (board.width - sx), sy + 1), 3);
+							currentBoard.apply_pattern(patterns[22], Point(gx + (board.width - sx), sy + 1), 3);
+						}
+						for (int bit : step(8)) {
 							if ((dy >> bit) & 1) {
-								const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
-								currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
+								const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
 								currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+								currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
 							}
 						}
-
-						if (currentSolution.steps.size() == 0) {
-							// Console << U"step size 0(y popcount not 0) " << Point(nx, ny);
-							continue;
+					}
+					else {
+						for (int bit : step(8)) {
+							if ((dx >> bit) & 1) {
+								const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+								currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
+								currentBoard.apply_pattern(pattern, Point(sx, sy), 2);
+							}
 						}
-						double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
+					}
 
-						if (currentProgressDelta > bestProgressDelta) {
-							bestProgressDelta = currentProgressDelta;
-							bestSolution = currentSolution;
-
-						}
+					double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
+					// Console << U"best:{}, current:{}"_fmt(bestProgressDelta, currentProgressDelta);
+					if (currentProgressDelta > bestProgressDelta) {
+						bestProgressDelta = currentProgressDelta;
+						bestSolution = currentSolution;
 					}
 				}
 			}
