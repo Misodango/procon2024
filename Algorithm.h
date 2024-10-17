@@ -10,7 +10,7 @@ namespace Algorithm {
 	enum class Type {
 		Greedy,
 		BeamSearch,
-		Greedy2
+		ImprovedGreedy
 	};
 
 	struct Solution {
@@ -18,7 +18,7 @@ namespace Algorithm {
 		Array<std::tuple<Pattern, Point, int32>> steps;
 		int32 score = 0;
 		Grid<int32> grid = Grid<int32>();
-		void outuputToJson() {
+		void outuputToJson() const {
 			JSON output;
 			output[U"n"] = static_cast<int32>(steps.size());
 			Array<JSON> ops;
@@ -57,12 +57,9 @@ namespace Algorithm {
 	// 貪欲
 	Solution greedy(const Board& initialBoard, const Array<Pattern>& patterns);
 
+
 	// ビームサーチ
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns);
-
-
-	// 貪欲を2行同時にやる
-	Solution greedy2(const Board& initialBoard, const Array<Pattern>& patterns);
 
 
 	Solution solve(Type algorithmType, const Board& initialBoard, const Array<Pattern>& patterns);

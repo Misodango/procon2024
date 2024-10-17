@@ -14,17 +14,17 @@
 #define BUTTON_HEIGHT 50
 #define BUTTON_WIDTH 200
 #define BUTTON_ROUND 5
-#define BUTTON_Y(n) (BOARD_AREA_SIZE - 50 - 100 * (4 - (n)))
+#define BUTTON_Y(n) (BOARD_AREA_SIZE - 50 - 100 * (5 - (n)))
 
 // JSONからゲームの初期化を行う関数
 std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 	JSON json;
 	Board board(1, 1);  // デフォルトの空のボードを作成
 	static Array<Pattern> patterns = StandardPatterns::getAllStandardPatterns_Grid();
-
+	FilePath tempPath = path;
 	try {
 		json = JSON::Load(path);
-		const FilePath path = FileSystem::FullPath(U"input.json");
+		const FilePath path = FileSystem::FullPath(tempPath);
 		Console << U"Full path: " << path;
 		JSON json = JSON::Load(path);
 		if (not json) {
@@ -48,29 +48,50 @@ std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 
 std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String token, const FilePath& path) {
 	JSON json;
-	Board board(1, 1);  // デフォルトの空のボードを作成
+	Board board(1, 1);
 	static Array<Pattern> patterns = StandardPatterns::getAllStandardPatterns_Grid();
 	const HashTable<String, String> header = { { U"Procon-Token",token} };
-	if (const auto response = SimpleHTTP::Get(url, header, path))
-	{
-		Console << U"------";
-		Console << response.getStatusLine().rtrimmed();
-		Console << U"status code: " << FromEnum(response.getStatusCode());
-		Console << U"------";
-		Console << response.getHeader().rtrimmed();
-		Console << U"------";
 
-		if (response.isOK())
-		{
-			Console << TextReader{ path }.readAll();
+	constexpr int MAX_RETRIES = 20;
+	constexpr int INITIAL_WAIT_MS = 100;
+	int currentWait = INITIAL_WAIT_MS;
+
+	for (int attempt = 0; attempt < MAX_RETRIES; ++attempt) {
+		if (attempt > 0) {
+			System::Sleep(currentWait);
+			currentWait *= 2;
+			Console << U"Retry attempt " << attempt << U"...";
+		}
+
+		if (const auto response = SimpleHTTP::Get(url, header, path)) {
+			const auto statusCode = response.getStatusCode();
+
+			switch (statusCode) {
+			case s3d::HTTPStatusCode::OK:
+				Console << U"Success!";
+				return initializeFromJSON(path);
+
+
+			case s3d::HTTPStatusCode::InternalServerError:
+			case s3d::HTTPStatusCode::BadGateway:
+			case s3d::HTTPStatusCode::ServiceUnavailable:
+			case s3d::HTTPStatusCode::GatewayTimeout:
+				Console << U"Server error. Retrying...";
+				continue;
+
+			default:
+				if (FromEnum(statusCode) >= 400 && FromEnum(statusCode) < 500) {
+					Console << U"Client error: ";
+					// throw Error(U"Client error occurred");
+				}
+			}
+		}
+		else {
+			Console << U"Connection failed. Retrying...";
 		}
 	}
-	else
-	{
-		Console << U"Get Failed.";
-	}
 
-	return initializeFromJSON(path);
+	throw Error(U"Failed to initialize after " + Format(MAX_RETRIES) + U" attempts");
 }
 
 void postAnswer(const URL& url, const String token, const FilePath& path) {
@@ -211,11 +232,11 @@ void Main() {
 	int gameStartTime = -1;
 
 	// tokenはもらったやつを使う
-	const String token = U"token1";
-	auto [board, patterns] = initializeFromGet(getUrl, token, U"input.json");
+	const String token = U"kumamotoaccde9a1a8f15e4993dabb0d6c09aac7d3095c6172f68f34dbf3e950";
+	// auto [board, patterns] = initializeFromGet(getUrl, token, U"input.json");
 
 	// JSONファイルからゲームを初期化
-	// auto [board, patterns] = initializeFromJSON(U"input.json");
+	auto [board, patterns] = initializeFromJSON(U"logo.json");
 
 	// 盤面１マス当たりのサイズ
 	int32 cellSize = Min(BOARD_AREA_SIZE / board.width, BOARD_AREA_SIZE / board.height);
@@ -231,7 +252,7 @@ void Main() {
 	const Array<Algorithm::Type> algorithms = {
 		Algorithm::Type::Greedy,
 		Algorithm::Type::BeamSearch,
-		Algorithm::Type::Greedy2,
+		Algorithm::Type::ImprovedGreedy,
 	};
 	const Array<String> algorithmNames = { U"Greedy", U"BeamSearch", U"Greedy2" };
 
@@ -244,10 +265,12 @@ void Main() {
 	RoundRect algorithmButton(BUTTON_X, BUTTON_Y(2), BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_ROUND);
 	RoundRect autoButton(BUTTON_X, BUTTON_Y(3), BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_ROUND);
 	RoundRect resetButton(BUTTON_X, BUTTON_Y(4), BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_ROUND);
+	RoundRect submitButton(BUTTON_X, BUTTON_Y(5), BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_ROUND);
 
 	// リセット機能
 	// 10回押したらリセットされる
 	int32 resetConfirmationCount = 0;
+	int32 submitConfirmationCount = 0;
 
 	// マウス入力（座標のみ）を無視するかどうか
 	// m キーで切り替え
@@ -290,6 +313,11 @@ void Main() {
 				// getする
 				board = initializeFromGet(getUrl, token, U"input.json").first;
 
+				// 空の回答を送信
+				Algorithm::Solution emptySolution;
+				emptySolution.outuputToJson();
+				postAnswer(postUrl, token, U"output.json");
+
 				// 進度初期化
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.height * board.width)));
 
@@ -302,12 +330,27 @@ void Main() {
 			}
 		}
 
+		if (submitButton.leftClicked()) {
+			submitConfirmationCount++;
+			// submitボタン付近の座標が型抜きに適用されてしまうのを防ぐためにモードを変更
+			currentMode = GameMode::Auto;
+
+			if (submitConfirmationCount == 10) {
+				submitConfirmationCount = 0;
+				// 出力と回答
+				if (board.is_goal()) {
+					answer.outuputToJson();
+					postAnswer(postUrl, token, U"output.json");
+					Console << postUrl;
+				}
+			}
+		}
+
 		// 自動 (貪欲)
 		if (autoButton.leftClicked()) {
 			// 既に揃っていたらリプレイ
 			if (board.is_goal()) {
 				// get時に"input.json"に保存済み
-				// board = initializeFromJSON(U"input.json").first;
 				// リプレイ用の一時的な盤面
 				Board replayBoard = initializeFromJSON(U"input.json").first;;
 				size_t currentStep = 0;
@@ -361,6 +404,11 @@ void Main() {
 			else {
 				// 現在の盤面からスタート
 				const auto& solution = Algorithm::solve(Algorithm::Type::Greedy, board, patterns);
+
+				// 提出
+				solution.outuputToJson();
+				postAnswer(postUrl, token, U"output.json");
+				Console << postUrl;
 
 				// 適用&回答に保存
 				for (const auto& action : solution.steps) {
@@ -417,7 +465,11 @@ void Main() {
 
 			// アルゴリズムを実行
 			if (KeySpace.down()) {
+				auto startTime = std::chrono::high_resolution_clock::now();
 				auto solution = Algorithm::solve(algorithms[currentAlgorithm], board, patterns);
+				auto endTime = std::chrono::high_resolution_clock::now();
+				double elapsedTime = std::chrono::duration<double>(endTime - startTime).count();
+				Console << U"Time taken: " << elapsedTime << U" seconds";
 				Console << U"step size:" << solution.steps.size();
 				// 移動方向割合の確認
 				Array<int> directionCount(4, 0);
@@ -431,12 +483,6 @@ void Main() {
 				}
 				Console << directionCount;
 
-				// 出力と回答
-				if (board.is_goal()) {
-					answer.outuputToJson();
-					postAnswer(postUrl, token, U"output.json");
-					Console << postUrl;
-				}
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.height * board.width)));
 			}
 		}
@@ -448,6 +494,7 @@ void Main() {
 		algorithmButton.draw(currentMode == GameMode::Auto ? buttonColor : white);
 		autoButton.draw(autoColor);
 		resetButton.draw(resetColor);
+		submitButton.draw(buttonColor);
 		FontAsset(U"Button")(U"Manual").drawAt(manualButton.center(), buttonTextColor);
 		FontAsset(U"Button")(U"Algo").drawAt(algorithmButton.center(), buttonTextColor);
 		FontAsset(U"Button")(U"Auto").drawAt(autoButton.center(), buttonTextColor);
@@ -455,6 +502,7 @@ void Main() {
 		// -> あと一回でリセットの意
 		const double p2 = Periodic::Sine0_1(1s);
 		FontAsset(U"Button")(U"!!Reset!!").drawAt(resetButton.center(), (resetConfirmationCount == 9) ? buttonTextColor * p2 : buttonTextColor);
+		FontAsset(U"Button")(U"!!Submit!!").drawAt(submitButton.center(), (submitConfirmationCount == 9) ? buttonTextColor * p2 : buttonTextColor);
 
 		// 情報表示
 		// 実際の値を計算
