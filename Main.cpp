@@ -48,29 +48,50 @@ std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 
 std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String token, const FilePath& path) {
 	JSON json;
-	Board board(1, 1);  // デフォルトの空のボードを作成
+	Board board(1, 1);
 	static Array<Pattern> patterns = StandardPatterns::getAllStandardPatterns_Grid();
 	const HashTable<String, String> header = { { U"Procon-Token",token} };
-	if (const auto response = SimpleHTTP::Get(url, header, path))
-	{
-		Console << U"------";
-		Console << response.getStatusLine().rtrimmed();
-		Console << U"status code: " << FromEnum(response.getStatusCode());
-		Console << U"------";
-		Console << response.getHeader().rtrimmed();
-		Console << U"------";
 
-		if (response.isOK())
-		{
-			Console << TextReader{ path }.readAll();
+	constexpr int MAX_RETRIES = 20;
+	constexpr int INITIAL_WAIT_MS = 100;
+	int currentWait = INITIAL_WAIT_MS;
+
+	for (int attempt = 0; attempt < MAX_RETRIES; ++attempt) {
+		if (attempt > 0) {
+			System::Sleep(currentWait);
+			currentWait *= 2;
+			Console << U"Retry attempt " << attempt << U"...";
+		}
+
+		if (const auto response = SimpleHTTP::Get(url, header, path)) {
+			const auto statusCode = response.getStatusCode();
+
+			switch (statusCode) {
+			case s3d::HTTPStatusCode::OK:
+				Console << U"Success!";
+				return initializeFromJSON(path);
+
+
+			case s3d::HTTPStatusCode::InternalServerError:
+			case s3d::HTTPStatusCode::BadGateway:
+			case s3d::HTTPStatusCode::ServiceUnavailable:
+			case s3d::HTTPStatusCode::GatewayTimeout:
+				Console << U"Server error. Retrying...";
+				continue;
+
+			default:
+				if (FromEnum(statusCode) >= 400 && FromEnum(statusCode) < 500) {
+					Console << U"Client error: ";
+					throw Error(U"Client error occurred");
+				}
+			}
+		}
+		else {
+			Console << U"Connection failed. Retrying...";
 		}
 	}
-	else
-	{
-		Console << U"Get Failed.";
-	}
 
-	return initializeFromJSON(path);
+	throw Error(U"Failed to initialize after " + Format(MAX_RETRIES) + U" attempts");
 }
 
 void postAnswer(const URL& url, const String token, const FilePath& path) {
