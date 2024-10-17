@@ -611,7 +611,7 @@ namespace Algorithm {
 		int compareRows(int sx, int sy, int nx, int ny) const {
 			int cnt = 0;
 			for (int x = sx; x < width; x++) {
-				if (getGrid(x, ny) != getGoal(x, sy))break;
+				if (getGrid(x, ny) != getGoal(x, sy))continue;
 				cnt++;
 			}
 			return cnt;
@@ -999,344 +999,130 @@ namespace Algorithm {
 		return solution;
 	}
 
-	/*
-	* sx sy : 揃えたいマス
-	* nx ny : (sx,sy)に対応するマス
-	* gy    : (sx,sy)に直接持ってくるのではなく、syから離れた点にもってきて最後によこしまの抜き型で揃える 2冪
-	* cnt   : (sx,sy),(nx,ny)に対応する領域の個数 nxが1つめ
-	*/
 
-	Solution nextState(const OptimizedBoard& initialBoard, const Array<Pattern>& patterns, int sx, int sy, int& nx, int& ny,
-		int gy, const Solution& initialSolution, int cnt = 1) {
-		Solution solution = initialSolution;
-
-		unsigned dy = ny - sy - 1; // gy = 1の分引く
-		int dx = nx - sx;
-
-		// 任意の行で任意の数列を探す
-		// 戻り値
-		// (x, len) : (始点、長さ)
-		auto findSequence = [](const OptimizedBoard& board, int row, Array<int> target) -> std::pair<int, int> {
-			int range = target.size();
-			int bestLength = 0;
-			int bestX = 0;
-			for (int x : step(board.width)) {
-				if (board.getGrid(x, row) != target[0]) continue;
-
-				// 区間すべてが一致するか
-				bool isCorrectAll = 1;
-				int currentLength = 0;
-				for (int len = 1; len < target.size(); len++) {
-					int nx = (x + len) % board.width;
-					if (board.getGrid(nx, row) == target[len]) continue;
-					isCorrectAll = 0;
-					currentLength = len;
-				}
-				if (isCorrectAll) {
-					currentLength = target.size();
-				}
-				if (bestLength < currentLength) {
-					bestLength = currentLength;
-					bestX = x;
-				}
-			}
-			Console << U"bestX:{}, bestLength:{}"_fmt(bestX, bestLength);
-			return { bestX, bestLength };
-			};
-
-		// ctz
-		auto  CountTrailingZeros = [](uint32_t x)->int {
-			if (x == 0) return 32;
-
-			int count = 0;
-			while ((x & 1) == 0) {
-				count++;
-				x >>= 1;
-			}
-			return count;
-			};
-
-		// dyが２べきなら抜き型1で一手で終わらせる
-		// if (std::popcount(dy) == 1) {
-		if (ny == 1) {
-			int cnt = initialBoard.calculateSuccessiveArea(sx, sy, nx, ny);
-			Console << U"final count:" << cnt;
-			int bestBit = 0;
-			int bestProgress = 0;
-			for (int bit : step(8)) {
-				OptimizedBoard currentBoard = initialBoard;
-				const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 2];
-				currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
-				int currentProgress = currentBoard.getCorrectCount();
-				if (currentProgress > bestProgress) {
-					bestProgress = currentProgress;
-					bestBit = bit;
-				}
-			}
-
-			const auto& pattern = (bestBit == 0) ? patterns[0] : patterns[3 * (bestBit - 1) + 2];
-			solution.steps.emplace_back(pattern, Point(sx, sy), 0);
-			return solution;
-		}
-
-		// dyを小さくする
-		// 2進表記で小さいほうのbitから選ぶ
-		// cntに応じて適用のx座標をずらす
-		// 抜き型のサイズ : s = 2^(bit)
-		// 適用可能区間(x)
-		// [nx-s-1,nx]
-
-		// 下位ビットの連続する0の個数
-		// 抜き型を出す
-		int bit = CountTrailingZeros(dy);
-
-		// nyが移動する
-		ny -= (1 << bit);
-
-		// いったん何も計算せずにやってみる
-		// あとからdx方向にpopcount制限を付けて考える
-		Array<int> target;
-		for (int x = nx; x < initialBoard.width; x++) {
-			target.emplace_back(x);
-		}
-
-		const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-
-		// 新しいカウント
-		int bestCount = 0;
-		// nxから連続する領域で左端を抜き型の左端と揃える
-		// nx - cnt - 1
-		// cntは2冪
-		// int applyX = Min(nx, nx + cnt - (1 << bit));
-		int applyX = nx;
-		solution.steps.emplace_back(pattern, Point(applyX, sy + gy), 0);
-		return solution;
-	}
-
-
-	//Solution greedy2(const Board& initialBoard, const Array<Pattern>& patterns) {
-	//	OptimizedBoard board(initialBoard.width, initialBoard.height, initialBoard.grid, initialBoard.goal);
-	//	Solution solution;
-	//	int progress = board.getCorrectCount();
-
-	//	auto findCandidates = [](int sx, int sy, const OptimizedBoard& board)->Array<std::pair<int, int>> {
-	//		Array<std::pair<int, int>> result;
-	//		int target = board.getGoal(sx, sy);
-	//		// 同じ列
-	//		for (int ny = sy + 1; ny < board.height; ny++) {
-	//			if (board.getGrid(sx, ny) == target && std::popcount(unsigned(ny - sy - 1)) == 3) {
-	//				result.emplace_back(sx, ny);
-	//			}
-	//		}
-	//		if (!result.empty()) return result;
-
-	//		// 見つからなかったらほかの行も
-	//		for (int ny = sy + 1; ny < board.height; ny++) {
-	//			for (int nx : step(board.width)) {
-	//				if (board.getGrid(nx, ny) != target) continue;
-	//				result.emplace_back(nx, ny);
-	//			}
-	//		}
-	//		return result;
-
-	//		};
-
-
-	//	while (!board.isGoal()) {
-	//		progress = board.getCorrectCount();
-	//		int sy = progress / board.width, sx = progress % board.width;
-	//		Console << U"sx,sy" << Point(sx, sy);
-	//		int target = board.getGoal(sx, sy);
-	//		const auto& candidates = findCandidates(sx, sy, board);
-	//		// sy+1行よりしたのマスを探索する
-	//		// sy+1行に持ってきて、よこしまの抜き型で入れる
-
-	//		Solution bestSolution;
-	//		// progressの差分/手数
-	//		double bestProgressDelta = 0;
-
-	//		for (auto [nx, ny] : candidates) {
-	//			OptimizedBoard currentBoard = board;
-	//			Solution currentSolution;
-	//			Console << U"start nx, ny:" << Point(nx, ny);
-	//			while (currentBoard.getGoal(sx, sy) != currentBoard.getGrid(sx, sy)) {
-	//				Console << U"nx, ny" << Point(nx, ny);
-	//				int cnt = currentBoard.calculateSuccessiveArea(sx, sy, nx, ny);
-	//				Console << U"cnt:" << cnt;
-	//				Solution nextSolution = nextState(board, patterns, sx, sy, nx, ny, 1, solution, cnt);
-	//				for (const auto& action : nextSolution.steps) {
-	//					const auto& [pattern, point, direction] = action;
-	//					currentBoard.apply_pattern(pattern, point, direction);
-	//					currentSolution.steps.emplace_back(action);
-	//				}
-	//				double progressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
-	//				Console << progressDelta;
-	//				if (progressDelta > bestProgressDelta) {
-	//					bestProgressDelta = progressDelta;
-	//					bestSolution = currentSolution;
-	//				}
-	//			}
-
-	//		}
-	//		return bestSolution;
-
-	//	}
-
-	//	auto startTime = std::chrono::high_resolution_clock::now();
-
-
-
-	//	startTime = std::chrono::high_resolution_clock::now();
-	//	//for (int sy : step(board.height)) {
-	//	//	for (int sx : step(board.width)) {
-	//	//		std::vector<std::pair<int, int>> candidates;
-	//	//		int target = board.getGoal(sx, sy);
-	//	//		for (int ny = sy; ny < board.height; ny++) {
-	//	//			for (int nx = sx; nx < board.height; nx++) {
-	//	//				if (board.getGrid(nx, ny) == target) {
-	//	//					candidates.emplace_back(nx, ny);
-	//	//				}
-	//	//			}
-	//	//		}
-	//	//		// Console << candidates;
-	//	//	}
-	//	//}
-
-	//	auto currentTime = std::chrono::high_resolution_clock::now();
-	//	double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
-	//	Console << elapsedTime << U"sec";
-	//	return Solution();
-	//	return solution;
-	//}
-
-	Solution greedy2(const Board& initialBoard, const Array<Pattern>& patterns) {
-		OptimizedBoard board(initialBoard.width, initialBoard.height, initialBoard.grid, initialBoard.goal);
+	Solution optimizedGreedy(const OptimizedBoard& initialBoard, const Array<Pattern>& patterns) {
+		OptimizedBoard board = initialBoard;
 		// Z字に進行(横書き文章の順)
 		// 3HWで解く
 		// 1番右の列を移動につかうことで3HWで解ける?
 		auto startTime = std::chrono::high_resolution_clock::now();
 		Solution solution;
-		for (int sy = 0; sy < board.height; sy++) {
-			if (board.compareRows(0, sy, 0, sy) < board.compareRows(0, sy, 0, sy + 1)) {
-				board.apply_pattern(patterns[23], Point(0, sy), 0);
-				solution.steps.emplace_back(patterns[23], Point(0, sy), 0);
-			}
-			for (int sx = 0; sx < board.width; sx++) {
-				if (board.getGrid(sx, sy) == board.getGoal(sx, sy)) continue;
-				int32 progress = board.getCorrectCount();
-				// int32 sy = progress / board.width, sx = progress % board.width;
-				Console << U"sy:" << sy;
-				const auto& candidates = board.sortedFindPointsWithSameValueAndYPopcountDiff1(sx, sy);
+		while (!board.isGoal()) {
 
-				Solution bestSolution;
-				double bestProgressDelta = 0;
+			int32 progress = board.getCorrectCount();
+			int32 sy = progress / board.width, sx = progress % board.width;
 
-				for (const auto& [nx, ny] : candidates) {
-					OptimizedBoard currentBoard = board;
-					// Console << U"nx, ny : " << Point(nx, ny);
-					Solution currentSolution;
-					const int32 dy = ny - sy, dx = nx - sx;
+			const auto& candidates = board.sortedFindPointsWithSameValueAndYPopcountDiff1(sx, sy);
 
-					if (dy == 0) {
-						const int bit = log2(dx);
-						const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
-						currentBoard.apply_pattern(pattern, Point(sx, sy), 2);
-						currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
+			Solution bestSolution;
+			double bestProgressDelta = 0;
+
+			for (const auto& [nx, ny] : candidates) {
+				OptimizedBoard currentBoard = board;
+				// Console << U"nx, ny : " << Point(nx, ny);
+				Solution currentSolution;
+				const int32 dy = ny - sy, dx = nx - sx;
+
+				if (dy == 0) {
+					const int bit = log2(dx);
+					const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+					currentBoard.apply_pattern(pattern, Point(sx, sy), 2);
+					currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
+				}
+				else {
+					if (dx > 0) {
+						currentBoard.apply_pattern(patterns[22], Point(dx - 256, ny), 2);
+						currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, ny), 2);
 					}
-					else {
+					else if (dx < 0) {
+						currentBoard.apply_pattern(patterns[22], Point(dx + board.width, ny), 3);
+						currentSolution.steps.emplace_back(patterns[22], Point(dx + board.width, ny), 3);
+					}
+
+
+					if (dy > 0) {
+						const int bit = log2(dy);
+						const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+						currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
+						currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+					}
+				}
+				if (currentSolution.steps.size() == 0) {
+					// Console << U"step size 0 " << Point(nx, ny);
+					continue;
+				}
+				double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
+				if (currentProgressDelta > bestProgressDelta) {
+					bestProgressDelta = currentProgressDelta;
+					bestSolution = currentSolution;
+				}
+			}
+
+			// 見つからなかったとき
+			if (bestSolution.steps.empty()) {
+				std::vector<std::pair<int, int>> targets;
+				int target = board.getGoal(sx, sy);
+				//　同じ行で探す
+				for (int nx = sx; nx < board.width; nx++) {
+					if (board.getGrid(nx, sy) == target) {
+						targets.emplace_back(nx, sy);
+					}
+				}
+
+				// 別の行( popcountで差が1じゃない行)
+				for (int ny = sy + 1; ny < board.height; ny++) {
+					for (int nx : step(board.width)) {
+						if (board.getGrid(nx, ny) != target) continue;
+						targets.emplace_back(nx, ny);
+					}
+				}
+
+				for (const auto& [gx, gy] : targets) {
+					int dx = gx - sx, dy = gy - sy;
+					Solution currentSolution;
+					OptimizedBoard currentBoard = board;
+					if (dy > 0) {
 						if (dx > 0) {
-							currentBoard.apply_pattern(patterns[22], Point(dx - 256, ny), 2);
-							currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, ny), 2);
+							currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, sy + 1), 2);
+							currentBoard.apply_pattern(patterns[22], Point(dx - 256, sy + 1), 2);
 						}
 						else if (dx < 0) {
-							currentBoard.apply_pattern(patterns[22], Point(dx + board.width, ny), 3);
-							currentSolution.steps.emplace_back(patterns[22], Point(dx + board.width, ny), 3);
+							currentSolution.steps.emplace_back(patterns[22], Point(gx + (board.width - sx), sy + 1), 3);
+							currentBoard.apply_pattern(patterns[22], Point(gx + (board.width - sx), sy + 1), 3);
 						}
-
-
-						if (dy > 0) {
-							const int bit = log2(dy);
-							const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
-							currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
-							currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+						for (int bit : step(8)) {
+							if ((dy >> bit) & 1) {
+								const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+								currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
+								currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
+							}
 						}
 					}
-					if (currentSolution.steps.size() == 0) {
-						// Console << U"step size 0 " << Point(nx, ny);
-						continue;
+					else {
+						for (int bit : step(8)) {
+							if ((dx >> bit) & 1) {
+								const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
+								currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
+								currentBoard.apply_pattern(pattern, Point(sx, sy), 2);
+							}
+						}
 					}
+
 					double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
+					// Console << U"best:{}, current:{}"_fmt(bestProgressDelta, currentProgressDelta);
 					if (currentProgressDelta > bestProgressDelta) {
 						bestProgressDelta = currentProgressDelta;
 						bestSolution = currentSolution;
 					}
 				}
-
-				// 見つからなかったとき
-				if (bestSolution.steps.empty()) {
-					std::vector<std::pair<int, int>> targets;
-					int target = board.getGoal(sx, sy);
-					//　同じ行で探す
-					for (int nx = sx; nx < board.width; nx++) {
-						if (board.getGrid(nx, sy) == target) {
-							targets.emplace_back(nx, sy);
-						}
-					}
-
-					// 別の行( popcountで差が1じゃない行)
-					for (int ny = sy + 1; ny < board.height; ny++) {
-						for (int nx : step(board.width)) {
-							if (board.getGrid(nx, ny) != target) continue;
-							targets.emplace_back(nx, ny);
-						}
-					}
-
-					for (const auto& [gx, gy] : targets) {
-						int dx = gx - sx, dy = gy - sy;
-						Solution currentSolution;
-						OptimizedBoard currentBoard = board;
-						if (dy > 0) {
-							if (dx > 0) {
-								currentSolution.steps.emplace_back(patterns[22], Point(dx - 256, sy + 1), 2);
-								currentBoard.apply_pattern(patterns[22], Point(dx - 256, sy + 1), 2);
-							}
-							else if (dx < 0) {
-								currentSolution.steps.emplace_back(patterns[22], Point(gx + (board.width - sx), sy + 1), 3);
-								currentBoard.apply_pattern(patterns[22], Point(gx + (board.width - sx), sy + 1), 3);
-							}
-							for (int bit : step(8)) {
-								if ((dy >> bit) & 1) {
-									const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-									currentSolution.steps.emplace_back(pattern, Point(sx, sy), 0);
-									currentBoard.apply_pattern(pattern, Point(sx, sy), 0);
-								}
-							}
-						}
-						else {
-							for (int bit : step(8)) {
-								if ((dx >> bit) & 1) {
-									const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-									currentSolution.steps.emplace_back(pattern, Point(sx, sy), 2);
-									currentBoard.apply_pattern(pattern, Point(sx, sy), 2);
-								}
-							}
-						}
-
-						double currentProgressDelta = double(currentBoard.getCorrectCount() - progress) / currentSolution.steps.size();
-						// Console << U"best:{}, current:{}"_fmt(bestProgressDelta, currentProgressDelta);
-						if (currentProgressDelta > bestProgressDelta) {
-							bestProgressDelta = currentProgressDelta;
-							bestSolution = currentSolution;
-						}
-					}
-				}
-				for (const auto& action : bestSolution.steps) {
-					const auto& [pattern, point, direction] = action;
-					board.apply_pattern(pattern, point, direction);
-					solution.steps.emplace_back(action);
-					// Console << U"pattern:{}, Point:{}, direction:{}"_fmt(pattern.p, point, direction);
-				}
 			}
+			for (const auto& action : bestSolution.steps) {
+				const auto& [pattern, point, direction] = action;
+				board.apply_pattern(pattern, point, direction);
+				solution.steps.emplace_back(action);
+				// Console << U"pattern:{}, Point:{}, direction:{}"_fmt(pattern.p, point, direction);
+			}
+
 		}
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
@@ -1346,6 +1132,71 @@ namespace Algorithm {
 		return solution;
 	}
 
+	// 行の入れ替えでも試してみる
+	Solution improveGreedy(const Board& initialBoard, const Array<Pattern>& patterns) {
+		const double TIME_LIMIT = 200.0;
+		auto startTime = std::chrono::high_resolution_clock::now();
+
+		Solution bestSolution = greedy(initialBoard, patterns);
+		int bestStepCount = bestSolution.steps.size();
+
+		int64_t totalTrials = 0;  // 試行回数カウンター
+
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+
+		while (elapsedTime < TIME_LIMIT) {
+			totalTrials++;  // 試行回数をインクリメント
+
+			Solution candidateSolution = bestSolution;
+			if (candidateSolution.steps.empty()) continue;
+
+			int changePos = rand() % candidateSolution.steps.size();
+
+			OptimizedBoard tempBoard(initialBoard.width, initialBoard.height, initialBoard.grid, initialBoard.goal);
+			Solution newSolution;
+
+			for (int i = 0; i < changePos; i++) {
+				const auto& [pattern, point, dir] = candidateSolution.steps[i];
+				tempBoard.apply_pattern(pattern, point, dir);
+				newSolution.steps.emplace_back(pattern, point, dir);
+			}
+
+			int patternIndex = rand() % patterns.size();
+			int currentProgress = tempBoard.getCorrectCount();
+			int currentX = currentProgress % tempBoard.width, currentY = currentProgress / tempBoard.width;
+			int x = Random<int>(currentX, initialBoard.width - 1);
+			int y = Random<int>(currentY, initialBoard.height - 1);
+			int direction = Sample({ 0,2,3 });
+
+			tempBoard.apply_pattern(patterns[patternIndex], Point(x, y), direction);
+			newSolution.steps.emplace_back(patterns[patternIndex], Point(x, y), direction);
+
+			OptimizedBoard remainingBoard = tempBoard;
+			Solution remainingSolution = optimizedGreedy(remainingBoard, patterns);
+
+			for (const auto& step : remainingSolution.steps) {
+				newSolution.steps.emplace_back(step);
+			}
+
+			if (newSolution.steps.size() < bestStepCount) {
+				bestSolution = newSolution;
+				bestStepCount = newSolution.steps.size();
+				Console << U"Improved! Steps: " << bestStepCount << U", Trials: " << totalTrials;
+			}
+
+			currentTime = std::chrono::high_resolution_clock::now();
+			elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+		}
+
+		Console << U"Total trials: " << totalTrials;
+		Console << U"Final step count: " << bestStepCount;
+		Console << U"Time taken: " << elapsedTime << U" seconds";
+		Console << U"Trials per second: " << (double)totalTrials / elapsedTime;
+		return bestSolution;
+	}
+
+
 	Solution solve(Type algorithmType, const Board& initialBoard, const Array<Pattern>& patterns) {
 		switch (algorithmType) {
 		case Type::Greedy:
@@ -1354,8 +1205,8 @@ namespace Algorithm {
 		case Type::BeamSearch:
 			return beamSearch(initialBoard, patterns);
 
-		case Type::Greedy2:
-			return greedy2(initialBoard, patterns);
+		case Type::ImprovedGreedy:
+			return improveGreedy(initialBoard, patterns);
 		default:
 			throw Error(U"Unknown algorithm type");
 		}
