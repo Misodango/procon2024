@@ -645,98 +645,108 @@ namespace Algorithm {
 
 	Array<Solution> optimizedNextState(const OptimizedBoard& initialBoard, const Array<Pattern>& patterns) {
 		Array<Solution> solutions;
-		int32 width = initialBoard.width, height = initialBoard.height;
-		static const int bitDy[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
-		static const int bitDx[] = { 1, 2, 4, 8, 16, 32, 64, 128 };
-		int correctCount = initialBoard.getCorrectCount();
-		int y = correctCount / width, x = correctCount % width;
-		// Console << U"start : " << Point(x, y);
+		const int32 width = initialBoard.width;
+		const int32 height = initialBoard.height;
+		const int32 correctCount = initialBoard.getCorrectCount();
+		const int32 y = correctCount / width;
+		const int32 x = correctCount % width;
+
+		// メモリ確保を一度だけ行う
+		solutions.reserve(32);  // 通常のケースで十分な数
+
+		// 最も可能性の高い候補を先に探索
 		const auto& candidates = initialBoard.sortedFindPointsWithSameValueAndYPopcountDiff1(x, y);
 
-		solutions.reserve(candidates.size());
-		auto evaluateSolution = [](Solution sol, OptimizedBoard b) -> double {
-			double score = 0;
-
-			};
-		// Console << candidates;
-		for (const auto& candidate : candidates) {
+		for (const auto& [nx, ny] : candidates) {
+			const int32 dy = ny - y;
+			const int32 dx = nx - x;
 			Solution solution;
-			int  dy = candidate.second - y, dx = candidate.first - x;
-			int bit = static_cast<int>(std::log2(dy));
-			if (dx == 0 && bit > 0) {
-				Solution solutionUsingType2;
-				const Pattern& pattern = patterns[3 * (bit - 1)];
-				solutionUsingType2.steps.emplace_back(pattern, Point(x, y), 0);
-				solutions.emplace_back(solutionUsingType2);
-			}
 
+			// 水平移動の場合
 			if (dy == 0) {
-				const int bit = log2(dx);
+				const int bit = log2(std::abs(dx));
 				const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
 				solution.steps.emplace_back(pattern, Point(x, y), 2);
+				solutions.emplace_back(std::move(solution));
 				continue;
 			}
-			else {
-				if (dx > 0) {
-					solution.steps.emplace_back(patterns[22], Point(candidate.first - x - 256, y + 1), 2);
-				}
-				else if (dx < 0) {
-					solution.steps.emplace_back(patterns[22], Point(candidate.first + (width - x), y + 1), 3);
-				}
-			}
-			const Pattern& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-			solution.steps.emplace_back(pattern, Point(x, y), 0);
-			solutions.emplace_back(solution);
-		}
 
-		if (!solutions.empty()) return solutions;
-
-
-		std::vector<std::pair<int, int>> targets;
-		int target = initialBoard.getGoal(x, y);
-		//　同じ行で探す
-		for (int nx = x; nx < width; nx++) {
-			if (initialBoard.getGrid(nx, y) == target) {
-				targets.emplace_back(nx, y);
-			}
-		}
-
-		// 別の行( popcountで差が1じゃない行)
-		for (int ny = y + 1; ny < height; ny++) {
-			for (int nx : step(width)) {
-				if (initialBoard.getGrid(nx, ny) != target) continue;
-				targets.emplace_back(nx, ny);
-			}
-		}
-		Console << U"targets size:" << targets.size();
-		for (const auto& [gx, gy] : targets) {
-			int dx = gx - x, dy = gy - y;
-			Solution solution;
-			if (dy > 0) {
+			// 垂直または斜め移動の場合
+			if (dx != 0) {
 				if (dx > 0) {
 					solution.steps.emplace_back(patterns[22], Point(dx - 256, y + 1), 2);
 				}
-				else if (dx < 0) {
-					solution.steps.emplace_back(patterns[22], Point(gx + (width - x), y + 1), 3);
-				}
-				for (int bit : step(8)) {
-					if ((dy >> bit) & 1) {
-						const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-						solution.steps.emplace_back(pattern, Point(x, y), 0);
-					}
-				}
-				solutions.emplace_back(solution);
-				continue;
-			}
-			for (int bit : step(8)) {
-				if ((dx >> bit) & 1) {
-					const auto& pattern = (bit == 0) ? patterns[0] : patterns[3 * (bit - 1) + 1];
-					solution.steps.emplace_back(pattern, Point(x, y), 2);
+				else {
+					solution.steps.emplace_back(patterns[22], Point(nx + (width - x), y + 1), 3);
 				}
 			}
-			solutions.emplace_back(solution);
+
+			// 垂直移動のパターンを追加
+			if (dy > 0) {
+				const int bit = log2(dy);
+				const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+				solution.steps.emplace_back(pattern, Point(x, y), 0);
+			}
+
+			if (!solution.steps.empty()) {
+				solutions.emplace_back(std::move(solution));
+			}
 		}
-		Console << U"current size:" << solutions.size();
+
+		// 候補が見つからない場合のフォールバック
+		if (solutions.empty()) {
+			const int target = initialBoard.getGoal(x, y);
+
+			// 同じ行での探索（最適化：範囲を限定）
+			for (int nx = x + 1; nx < width; nx++) {
+				if (initialBoard.getGrid(nx, y) == target) {
+					Solution solution;
+					const int dx = nx - x;
+					const int bit = log2(dx);
+					const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+					solution.steps.emplace_back(pattern, Point(x, y), 2);
+					solutions.emplace_back(std::move(solution));
+				}
+			}
+
+			// 他の行での探索（最適化：早期リターン条件を追加）
+			if (solutions.empty()) {
+				for (int ny = y + 1; ny < height; ny++) {
+					bool foundInRow = false;
+					for (int nx = 0; nx < width; nx++) {
+						if (initialBoard.getGrid(nx, ny) != target) continue;
+
+						Solution solution;
+						const int dx = nx - x;
+						const int dy = ny - y;
+
+						// 移動パターンの最適化
+						if (dx != 0) {
+							if (dx > 0) {
+								solution.steps.emplace_back(patterns[22], Point(dx - 256, y + 1), 2);
+							}
+							else {
+								solution.steps.emplace_back(patterns[22], Point(nx + (width - x), y + 1), 3);
+							}
+						}
+
+						// 垂直移動の最適化（ビット演算を使用）
+						for (int bit = 0; bit < 8; bit++) {
+							if (dy & (1 << bit)) {
+								const auto& pattern = bit == 0 ? patterns[0] : patterns[3 * (bit - 1) + 1];
+								solution.steps.emplace_back(pattern, Point(x, y), 0);
+							}
+						}
+
+						solutions.emplace_back(std::move(solution));
+						foundInRow = true;
+						if (solutions.size() >= 16) break;  // 十分な候補が見つかった場合は探索を終了
+					}
+					if (foundInRow) break;  // 1行で見つかった場合は探索を終了
+				}
+			}
+		}
+
 		return solutions;
 	}
 
@@ -744,127 +754,105 @@ namespace Algorithm {
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns) {
 		const int32 height = initialBoard.height;
 		const int32 width = initialBoard.width;
-		const int beamDepth = 1;
+		const int beamWidth = 30;
+		const int beamDepth = 70;
+
 		struct State {
 			OptimizedBoard board;
 			Solution solution;
 			double score;
 			int32 progress;
-			State(const OptimizedBoard& b, const Solution& s, double sc, int32 prog) : board(b), solution(s), score(sc), progress(prog) {}
+
+			// コンストラクタを単純化
+			State(const OptimizedBoard& b, const Solution& s, double sc, int32 prog)
+				: board(b)
+				, solution(s)
+				, score(sc)
+				, progress(prog) {}
 		};
-		auto progress = [](const Board& a) {
-			int32 res = 0;
-			for (int32 y : step(a.height)) {
-				for (int32 x : step(a.width)) {
-					if (a.grid[y][x] != a.goal[y][x]) {
-						return res;
-					}
-					res++;
-				}
-			}
-			};
 
-		OptimizedBoard board(width, height, initialBoard.grid, initialBoard.goal);
-
-		auto calculateScore = [](const OptimizedBoard& board, int stepCount) {
-			int correctCount = board.getCorrectCount();
+		// スコア計算関数
+		auto calculateScore = [](int correctCount, int stepCount, int totalCells) {
 			return static_cast<double>(correctCount) / (stepCount + 1);
 			};
 
-
+		// 状態比較関数
 		auto compareStates = [](const State& a, const State& b) {
-			// そろっている部分が多いときに使うと手数が削減される場合がある
-			/*if (a.score == b.score) {
-				return a.board.calculateDifference(a.board.grid) > b.board.calculateDifference(b.board.grid);
-			}*/
-			return a.score < b.score; // スコアが高い方が優先
+			return a.score < b.score;
 			};
 
+		OptimizedBoard board(width, height, initialBoard.grid, initialBoard.goal);
+		Solution finalSolution;
+		const auto startTime = std::chrono::high_resolution_clock::now();
 
-		auto beamSearchLambda = [&calculateScore, &compareStates, &patterns](std::priority_queue<State, std::vector<State>, decltype(compareStates)>& beam,
-			OptimizedBoard& board) -> Solution {
-				int beamWidth = 100;
-				auto startTime = std::chrono::high_resolution_clock::now();
-				State bestState = beam.top();
-				int beamDepth = 10;
-				for (int32 t : step(beamDepth)) {
-					Console << U"t:{}"_fmt(t);
-					std::priority_queue<State, std::vector<State>, decltype(compareStates)> nextBeam;
-					for (int32 w = 0; w < beamWidth; w++) {
-						if (beam.empty())break;
-						State currentState = beam.top();
-						Console << U"progress:" << currentState.progress << U"/{}steps"_fmt(currentState.solution.steps.size());
-						beam.pop();
-						if (currentState.board.isGoal()) continue;
-						// if (currentState.board.isGoal()) continue;
-						const auto& legalActions = optimizedNextState(currentState.board, patterns);
-						for (const auto& solutions : legalActions) {
-							OptimizedBoard nextBoard = currentState.board;
-							int32 stepSize = solutions.steps.size();
-							if (stepSize == 0) {
-								continue;
-							}
-							Solution nextSolution;
-							for (const auto& action : solutions.steps) {
-								const auto& [pattern, point, direction] = action;
-								nextBoard.apply_pattern(pattern, point, direction);
-								nextSolution.steps.emplace_back(action);
-								currentState.solution.steps.emplace_back(action);
-							}
-							int32 prog = nextBoard.getCorrectCount();
-							double delta = prog - currentState.progress;
-							// Console << U"score:{}, delta:{}"_fmt(solutions.score, delta/stepSize);
-							double newScore = delta / stepSize * prog / currentState.solution.steps.size() * board.getCorrectCountAll();
-							State newState = State(nextBoard, currentState.solution, newScore, prog);
+		while (!board.isGoal()) {
+			std::priority_queue<State, std::vector<State>, decltype(compareStates)> beam(compareStates);
+			beam.emplace(board, Solution(), 0, board.getCorrectCount());
 
-							if (t == 0) {
-								newState.solution = nextSolution;
-							}
-							for (int32 _ : step(stepSize)) currentState.solution.steps.pop_back();
-							nextBeam.emplace(newState);
-						}
-					}
 
-					beam = nextBeam;
-					if (beam.empty()) return bestState.solution;
-					bestState = beam.top();
-					int left = board.width * board.height - bestState.board.getCorrectCount();
-					if (left < 100) {
-						beamWidth = Max(30, beamWidth + 1);
-					}
-					if (bestState.board.isGoal()) {
-						auto currentTime = std::chrono::high_resolution_clock::now();
-						double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
-						Console << elapsedTime << U"sec";
+			State bestState = beam.top();
+			bool goalFound = false;
+
+			for (int32 t = 0; t < beamDepth && !goalFound; ++t) {
+				std::priority_queue<State, std::vector<State>, decltype(compareStates)> nextBeam(compareStates);
+				Console << U"progres:{}/step:{}"_fmt(bestState.progress, bestState.solution.steps.size());
+				for (int32 w = 0; w < beamWidth && !beam.empty(); ++w) {
+					State currentState = beam.top();
+					beam.pop();
+
+					if (currentState.board.isGoal()) {
+						bestState = currentState;
+						goalFound = true;
 						break;
 					}
 
+					const auto& legalActions = optimizedNextState(currentState.board, patterns);
+
+					for (const auto& solutions : legalActions) {
+						if (solutions.steps.empty()) continue;
+
+						OptimizedBoard nextBoard = currentState.board;
+						Solution nextSolution = currentState.solution;
+
+						for (const auto& action : solutions.steps) {
+							const auto& [pattern, point, direction] = action;
+							nextBoard.apply_pattern(pattern, point, direction);
+							nextSolution.steps.emplace_back(action);
+						}
+
+						int32 prog = nextBoard.getCorrectCount();
+						double delta = prog - currentState.progress;
+						double newScore = delta / solutions.steps.size() *
+							prog / nextSolution.steps.size() *
+							board.getCorrectCountAll();
+
+						nextBeam.emplace(nextBoard, nextSolution, newScore, prog);
+					}
 				}
 
-				return bestState.solution;
-			};
+				if (nextBeam.empty()) break;
+				beam = std::move(nextBeam);
+				bestState = beam.top();
+			}
 
+			if (bestState.solution.steps.empty()) break;
 
-		auto startTime = std::chrono::high_resolution_clock::now();
-		Solution solution;
-		while (!board.isGoal()) {
-			std::priority_queue<State, std::vector<State>, decltype(compareStates)> beam(compareStates);
-			beam.emplace(State(board, Solution(), 0, board.getCorrectCount()));
-			State bestState = beam.top();
-			const auto& legalActions = beamSearchLambda(beam, board);
-			if (legalActions.steps.empty()) break;
-			for (const auto& action : legalActions.steps) {
+			// 最良の解を適用
+			for (const auto& action : bestState.solution.steps) {
 				const auto& [pattern, point, direction] = action;
 				board.apply_pattern(pattern, point, direction);
-				solution.steps.emplace_back(action);
+				finalSolution.steps.emplace_back(action);
 			}
+
 			Console << U"progress:" << board.getCorrectCount();
 			if (board.isGoal()) break;
 		}
-		auto currentTime = std::chrono::high_resolution_clock::now();
-		double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
+
+		const auto currentTime = std::chrono::high_resolution_clock::now();
+		const double elapsedTime = std::chrono::duration<double>(currentTime - startTime).count();
 		Console << elapsedTime << U"sec";
-		return solution;
+
+		return finalSolution;
 	}
 
 	Solution greedy(const Board& initialBoard, const Array<Pattern>& patterns) {

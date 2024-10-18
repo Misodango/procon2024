@@ -78,13 +78,13 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 			case s3d::HTTPStatusCode::BadGateway:
 			case s3d::HTTPStatusCode::ServiceUnavailable:
 			case s3d::HTTPStatusCode::GatewayTimeout:
-				// Console << U"Server error. Retrying...";
+				Console << U"Server error. Retrying...";
 				httpResponse = U"GET:Server error Retrying...";
 				continue;
 
 			default:
 				if (FromEnum(statusCode) >= 400 && FromEnum(statusCode) < 500) {
-					// Console << U"Client error: ";
+					Console << U"Client error: ";
 					httpResponse = U"GET:ClientError";
 					// throw Error(U"Client error occurred");
 				}
