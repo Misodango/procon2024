@@ -786,7 +786,8 @@ namespace Algorithm {
 				int beamWidth = 100;
 				auto startTime = std::chrono::high_resolution_clock::now();
 				State bestState = beam.top();
-				for (int32 t : step(8)) {
+				int beamDepth = 10;
+				for (int32 t : step(beamDepth)) {
 					Console << U"t:{}"_fmt(t);
 					std::priority_queue<State, std::vector<State>, decltype(compareStates)> nextBeam;
 					for (int32 w = 0; w < beamWidth; w++) {
