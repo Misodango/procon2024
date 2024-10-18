@@ -46,12 +46,12 @@ std::pair<Board, Array<Pattern>> initializeFromJSON(const FilePath& path) {
 	return { board, patterns };
 }
 
-std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String token, const FilePath& path) {
+std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String token, const FilePath& path, String& httpResponse) {
 	JSON json;
 	Board board(1, 1);
 	static Array<Pattern> patterns = StandardPatterns::getAllStandardPatterns_Grid();
 	const HashTable<String, String> header = { { U"Procon-Token",token} };
-
+	static const ColorF headlineColor(U"#33272a");
 	constexpr int MAX_RETRIES = 20;
 	constexpr int INITIAL_WAIT_MS = 100;
 	int currentWait = INITIAL_WAIT_MS;
@@ -60,7 +60,8 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 		if (attempt > 0) {
 			System::Sleep(currentWait);
 			currentWait *= 2;
-			Console << U"Retry attempt " << attempt << U"...";
+			// Console << U"Retry attempt " << attempt << U"...";
+			httpResponse = U"GET:Retry attempt:{}"_fmt(attempt);
 		}
 
 		if (const auto response = SimpleHTTP::Get(url, header, path)) {
@@ -68,7 +69,8 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 
 			switch (statusCode) {
 			case s3d::HTTPStatusCode::OK:
-				Console << U"Success!";
+				// Console << U"Success!";
+				httpResponse = U"GET:Sucess!";
 				return initializeFromJSON(path);
 
 
@@ -76,22 +78,25 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 			case s3d::HTTPStatusCode::BadGateway:
 			case s3d::HTTPStatusCode::ServiceUnavailable:
 			case s3d::HTTPStatusCode::GatewayTimeout:
-				Console << U"Server error. Retrying...";
+				// Console << U"Server error. Retrying...";
+				httpResponse = U"GET:Server error Retrying...";
 				continue;
 
 			default:
 				if (FromEnum(statusCode) >= 400 && FromEnum(statusCode) < 500) {
-					Console << U"Client error: ";
+					// Console << U"Client error: ";
+					httpResponse = U"GET:ClientError";
 					// throw Error(U"Client error occurred");
 				}
 			}
 		}
 		else {
-			Console << U"Connection failed. Retrying...";
+			// Console << U"Connection failed. Retrying...";
+			httpResponse = U"Connection failed. Retrying...";
 		}
 	}
-
-	throw Error(U"Failed to initialize after " + Format(MAX_RETRIES) + U" attempts");
+	httpResponse = U"Failed to initialize after " + Format(MAX_RETRIES) + U" attempts";
+	// throw Error(U"Failed to initialize after " + Format(MAX_RETRIES) + U" attempts");
 }
 
 void postAnswer(const URL& url, const String token, const FilePath& path) {
@@ -225,7 +230,8 @@ void Main() {
 
 	// PCどうしでやるときはIPアドレスとportを書き換える
 	// const URL url = U"192.168.154.167:3000";
-	const URL url = U"127.0.0.1:8080";
+	const URL url = U"172.20.10.6:8080";
+	// const URL url = U"172.28.144.1:8080";
 	const URL getUrl = U"{}/problem"_fmt(url);
 	Console << getUrl;
 	const URL postUrl = U"{}/answer"_fmt(url);
@@ -282,6 +288,8 @@ void Main() {
 
 	//回答用
 	Algorithm::Solution answer;
+	// HTTPリクエスト結果保管用
+	String httpResponse = U"";
 
 	while (System::Update()) {
 		// 人力モード
@@ -311,7 +319,7 @@ void Main() {
 				//board = initializeFromJSON(U"input.json").first;
 
 				// getする
-				board = initializeFromGet(getUrl, token, U"input.json").first;
+				board = initializeFromGet(getUrl, token, U"input.json", httpResponse).first;
 
 				// 空の回答を送信
 				Algorithm::Solution emptySolution;
@@ -522,8 +530,9 @@ void Main() {
 			U"Mode: {}\n"			// モード
 			U"Progress: {}%\n"		// 進度
 			U"Prediction: {}%\n"	// マニュアルモードで現在の抜き型を適用した時の進度を先読み
-			U"Actual: {}\n"		// カーソルがある位置の正しい要素
-			U"Step Size: {}"_fmt(
+			U"Actual: {}\n"		    // カーソルがある位置の正しい要素
+			U"Step Size: {}\n"
+			U"{}"_fmt(
 			patterns[currentPattern].p,
 			patternPos.x, patternPos.y,
 			U"↑↓←→"[direction],
@@ -531,7 +540,8 @@ void Main() {
 			progress,
 			nextProgress,
 			actualValue,
-			answer.steps.size()
+			answer.steps.size(),
+			httpResponse
 			);
 
 		// フォーマット適用
