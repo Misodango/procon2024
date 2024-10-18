@@ -783,7 +783,7 @@ namespace Algorithm {
 
 		auto beamSearchLambda = [&calculateScore, &compareStates, &patterns](std::priority_queue<State, std::vector<State>, decltype(compareStates)>& beam,
 			OptimizedBoard& board) -> Solution {
-				int beamWidth = 3;
+				int beamWidth = 100;
 				auto startTime = std::chrono::high_resolution_clock::now();
 				State bestState = beam.top();
 				for (int32 t : step(8)) {
@@ -865,7 +865,6 @@ namespace Algorithm {
 		Console << elapsedTime << U"sec";
 		return solution;
 	}
-
 
 	Solution greedy(const Board& initialBoard, const Array<Pattern>& patterns) {
 		OptimizedBoard board(initialBoard.width, initialBoard.height, initialBoard.grid, initialBoard.goal);
@@ -1162,12 +1161,15 @@ namespace Algorithm {
 				newSolution.steps.emplace_back(pattern, point, dir);
 			}
 
-			int patternIndex = rand() % patterns.size();
+			int patternIndex = 23;
 			int currentProgress = tempBoard.getCorrectCount();
 			int currentX = currentProgress % tempBoard.width, currentY = currentProgress / tempBoard.width;
+			int direction = 0;
+			int y = currentY;
 			int x = Random<int>(currentX, initialBoard.width - 1);
-			int y = Random<int>(currentY, initialBoard.height - 1);
-			int direction = Sample({ 0,2,3 });
+			if (tempBoard.compareRows(x, y, x, y + 1) < tempBoard.compareRows(x, y, x, y)) {
+				continue;
+			}
 
 			tempBoard.apply_pattern(patterns[patternIndex], Point(x, y), direction);
 			newSolution.steps.emplace_back(patterns[patternIndex], Point(x, y), direction);
