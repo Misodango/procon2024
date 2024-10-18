@@ -789,6 +789,7 @@ namespace Algorithm {
 			std::priority_queue<State, std::vector<State>, decltype(compareStates)> beam(compareStates);
 			beam.emplace(board, Solution(), 0, board.getCorrectCount());
 
+
 			State bestState = beam.top();
 			bool goalFound = false;
 
