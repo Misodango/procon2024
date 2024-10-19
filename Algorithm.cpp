@@ -754,8 +754,11 @@ namespace Algorithm {
 	Solution beamSearch(const Board& initialBoard, const Array<Pattern>& patterns) {
 		const int32 height = initialBoard.height;
 		const int32 width = initialBoard.width;
-		const int beamWidth = 30;
-		const int beamDepth = 70;
+		// 20/30 : 1797/200sec
+		// 30/30 : 1777/430sec
+		// 25/25 : 1806/200sec
+		const int beamWidth = 20;
+		const int beamDepth = 30;
 
 		struct State {
 			OptimizedBoard board;

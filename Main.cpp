@@ -60,7 +60,7 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 		if (attempt > 0) {
 			System::Sleep(currentWait);
 			currentWait *= 2;
-			// Console << U"Retry attempt " << attempt << U"...";
+			Console << U"Retry attempt " << attempt << U"...";
 			httpResponse = U"GET:Retry attempt:{}"_fmt(attempt);
 		}
 
@@ -79,12 +79,13 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 			case s3d::HTTPStatusCode::ServiceUnavailable:
 			case s3d::HTTPStatusCode::GatewayTimeout:
 				Console << U"Server error. Retrying...";
+				Console << U"Server error: {}"_fmt(FromEnum(statusCode));
 				httpResponse = U"GET:Server error Retrying...";
 				continue;
 
 			default:
 				if (FromEnum(statusCode) >= 400 && FromEnum(statusCode) < 500) {
-					Console << U"Client error: ";
+					Console << U"Client error: {}"_fmt(FromEnum(statusCode));
 					httpResponse = U"GET:ClientError";
 					// throw Error(U"Client error occurred");
 				}
@@ -99,7 +100,7 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 	// throw Error(U"Failed to initialize after " + Format(MAX_RETRIES) + U" attempts");
 }
 
-void postAnswer(const URL& url, const String token, const FilePath& path) {
+void postAnswer(const URL& url, const String token, const FilePath& path, String& httpResponse) {
 
 	const HashTable<String, String> headers = { { U"Procon-Token", token }, {U"Content-Type", U"application/json"} };
 	const std::string data = JSON::Load(path).formatUTF8();
@@ -116,11 +117,13 @@ void postAnswer(const URL& url, const String token, const FilePath& path) {
 
 		if (response.isOK())
 		{
+			httpResponse = U"POST:Success!";
 			Console << TextReader{ saveFilePath }.readAll();
 		}
 	}
 	else
 	{
+		httpResponse = U"post failed";
 		Console << U"Failed.";
 	}
 }
@@ -229,9 +232,11 @@ void Main() {
 	const ColorF headlineColor(U"#33272a");
 
 	// PCどうしでやるときはIPアドレスとportを書き換える
-	// const URL url = U"192.168.154.167:3000";
-	const URL url = U"172.20.10.6:8080";
+	// 試合用
+	const URL url = U"172.29.1.2:80";
 	// const URL url = U"172.28.144.1:8080";
+	// const URL url = U"172.28.144.1:8080";
+	// const URL url = U"169.254.121.245:8080";
 	const URL getUrl = U"{}/problem"_fmt(url);
 	Console << getUrl;
 	const URL postUrl = U"{}/answer"_fmt(url);
@@ -242,7 +247,8 @@ void Main() {
 	// auto [board, patterns] = initializeFromGet(getUrl, token, U"input.json");
 
 	// JSONファイルからゲームを初期化
-	auto [board, patterns] = initializeFromJSON(U"logo.json");
+	// auto [board, patterns] = initializeFromJSON(U"practice.json");
+	auto [board, patterns] = initializeFromJSON(U"input.json");
 
 	// 盤面１マス当たりのサイズ
 	int32 cellSize = Min(BOARD_AREA_SIZE / board.width, BOARD_AREA_SIZE / board.height);
@@ -322,9 +328,9 @@ void Main() {
 				board = initializeFromGet(getUrl, token, U"input.json", httpResponse).first;
 
 				// 空の回答を送信
-				Algorithm::Solution emptySolution;
+				/*Algorithm::Solution emptySolution;
 				emptySolution.outuputToJson();
-				postAnswer(postUrl, token, U"output.json");
+				postAnswer(postUrl, token, U"output.json");*/
 
 				// 進度初期化
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.height * board.width)));
@@ -348,7 +354,7 @@ void Main() {
 				// 出力と回答
 				if (board.is_goal()) {
 					answer.outuputToJson();
-					postAnswer(postUrl, token, U"output.json");
+					postAnswer(postUrl, token, U"output.json", httpResponse);
 					Console << postUrl;
 				}
 			}
@@ -411,11 +417,11 @@ void Main() {
 			}
 			else {
 				// 現在の盤面からスタート
-				const auto& solution = Algorithm::solve(Algorithm::Type::Greedy, board, patterns);
+				const auto& solution = Algorithm::solve(Algorithm::Type::BeamSearch, board, patterns);
 
 				// 提出
 				solution.outuputToJson();
-				postAnswer(postUrl, token, U"output.json");
+				postAnswer(postUrl, token, U"output.json", httpResponse);
 				Console << postUrl;
 
 				// 適用&回答に保存
