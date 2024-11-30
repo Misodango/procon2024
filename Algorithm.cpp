@@ -12,7 +12,12 @@ namespace Algorithm {
 
 	class OptimizedBoard {
 	private:
+		// <summary>
 		// 盤面の1次元表現
+		// - `grid` : 現在の盤面データ
+		// - `goal` : ゴール盤面データ
+		// - `temp_grid` : 一時データ用
+		// </summary>
 		std::vector<uint64_t> grid;
 		std::vector<uint64_t> goal;
 		std::vector<uint64_t> temp_grid;
@@ -502,7 +507,7 @@ namespace Algorithm {
 				int progress = sx + dy + sy * width;
 				sx = progress % width; sy = progress / width;
 				return dy + getCorrectCountFrom(sx, sy);
-				};
+			};
 
 			if (specificY == -1) {
 				// dy = 0のとき
@@ -777,12 +782,12 @@ namespace Algorithm {
 		// スコア計算関数
 		auto calculateScore = [](int correctCount, int stepCount, int totalCells) {
 			return static_cast<double>(correctCount) / (stepCount + 1);
-			};
+		};
 
 		// 状態比較関数
 		auto compareStates = [](const State& a, const State& b) {
 			return a.score < b.score;
-			};
+		};
 
 		OptimizedBoard board(width, height, initialBoard.grid, initialBoard.goal);
 		Solution finalSolution;
