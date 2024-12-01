@@ -51,20 +51,12 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 	Board board(1, 1);
 	static Array<Pattern> patterns = StandardPatterns::getAllStandardPatterns_Grid();
 	const HashTable<String, String> header = { { U"Procon-Token",token} };
-	static const ColorF headlineColor(U"#33272a");
-	constexpr int MAX_RETRIES = 20;
-	constexpr int INITIAL_WAIT_MS = 100;
-	int currentWait = INITIAL_WAIT_MS;
 
-	for (int attempt = 0; attempt < MAX_RETRIES; ++attempt) {
-		if (attempt > 0) {
-			System::Sleep(currentWait);
-			currentWait *= 2;
-			Console << U"Retry attempt " << attempt << U"...";
-			httpResponse = U"GET:Retry attempt:{}"_fmt(attempt);
-		}
-
+	int32 MAX_RETRY = 10;
+	int32 WAIT_MS = 1000;
+	for (int32 i : step(MAX_RETRY)) {
 		if (const auto response = SimpleHTTP::Get(url, header, path)) {
+			// if (!response.isOK()) { return { board, patterns }; }
 			const auto statusCode = response.getStatusCode();
 
 			switch (statusCode) {
@@ -73,31 +65,28 @@ std::pair<Board, Array<Pattern>> initializeFromGet(const URL& url, const String 
 				httpResponse = U"GET:Sucess!";
 				return initializeFromJSON(path);
 
-
 			case s3d::HTTPStatusCode::InternalServerError:
 			case s3d::HTTPStatusCode::BadGateway:
 			case s3d::HTTPStatusCode::ServiceUnavailable:
 			case s3d::HTTPStatusCode::GatewayTimeout:
 				Console << U"Server error. Retrying...";
 				Console << U"Server error: {}"_fmt(FromEnum(statusCode));
-				httpResponse = U"GET:Server error Retrying...";
-				continue;
+				httpResponse = U"ATTEMPT:{} Server error: {}"_fmt(i, FromEnum(statusCode));
 
 			default:
 				if (FromEnum(statusCode) >= 400 && FromEnum(statusCode) < 500) {
 					Console << U"Client error: {}"_fmt(FromEnum(statusCode));
-					httpResponse = U"GET:ClientError";
-					// throw Error(U"Client error occurred");
+					httpResponse = U"ATTEMPT:{} Client error: {}"_fmt(i, FromEnum(statusCode));
 				}
 			}
 		}
 		else {
-			// Console << U"Connection failed. Retrying...";
-			httpResponse = U"Connection failed. Retrying...";
+			httpResponse = U"ATTEMPT:{} connection failed"_fmt(i);
+			Console << U"ATTEMPT:{} connection failed"_fmt(i);
 		}
+		System::Sleep(WAIT_MS);
 	}
-	httpResponse = U"Failed to initialize after " + Format(MAX_RETRIES) + U" attempts";
-	// throw Error(U"Failed to initialize after " + Format(MAX_RETRIES) + U" attempts");
+	return { board, patterns };
 }
 
 void postAnswer(const URL& url, const String token, const FilePath& path, String& httpResponse) {
@@ -233,10 +222,7 @@ void Main() {
 
 	// PCどうしでやるときはIPアドレスとportを書き換える
 	// 試合用
-	const URL url = U"172.29.1.2:80";
-	// const URL url = U"172.28.144.1:8080";
-	// const URL url = U"172.28.144.1:8080";
-	// const URL url = U"169.254.121.245:8080";
+	const URL url = U"172.27.112.1:3000";
 	const URL getUrl = U"{}/problem"_fmt(url);
 	Console << getUrl;
 	const URL postUrl = U"{}/answer"_fmt(url);
@@ -296,6 +282,8 @@ void Main() {
 	Algorithm::Solution answer;
 	// HTTPリクエスト結果保管用
 	String httpResponse = U"";
+	// 非同期処理
+	AsyncTask<std::pair<Board, Array<Pattern>>> task;
 
 	while (System::Update()) {
 		// 人力モード
@@ -325,12 +313,14 @@ void Main() {
 				//board = initializeFromJSON(U"input.json").first;
 
 				// getする
-				board = initializeFromGet(getUrl, token, U"input.json", httpResponse).first;
-
-				// 空の回答を送信
-				/*Algorithm::Solution emptySolution;
-				emptySolution.outuputToJson();
-				postAnswer(postUrl, token, U"output.json");*/
+				// board = initializeFromGet(getUrl, token, U"input.json", httpResponse).first;
+				
+				task = Async(initializeFromGet, std::ref(getUrl), token, U"input.json", std::ref(httpResponse));
+				FontAsset(U"Button")(httpResponse).draw(700, 700, buttonTextColor);
+				// 非同期タスクが終了したら
+				if (task.isReady()) {
+					board = task.get().first;
+				}
 
 				// 進度初期化
 				progress = 100.0 * (1.0 - double(board.calculateDifference(board.grid)) / double((board.height * board.width)));
@@ -572,5 +562,11 @@ void Main() {
 			FontAsset(U"Cell")(U"Goal Reached!").drawAt(Scene::Center(), Palette::Red);
 		}
 
+	}
+
+	// 実行途中のタスクがあれば完了まで待つ。
+	if (task.isValid())
+	{
+		task.wait();
 	}
 }
